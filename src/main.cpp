@@ -1,7 +1,9 @@
+#include <chrono>
 #include <cstddef>
 #include <iostream>
 #include <string>
 
+#include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "common/ZeitgeistDB.hpp"
 #include "common/util/StringUtil.hpp"
@@ -13,7 +15,7 @@ int main(int argc, char *argv[]) {
   linenoiseHistorySetMaxLen(1024);
   linenoiseSetMultiLine(1);
 
-  std::cout << "Welcome to ZeitgeistDB!\n";
+  std::cout << "Welcome to ZeitgeistDB!\n\n";
 
   auto prompt = "ZeitgeistDB > ";
   while (true) {
@@ -38,11 +40,15 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    ;
-
-    if (DB::Status status = db.ExecuteQuery(query); !status.ok()) {
-      std::cout << status.GetMessage();
+    DB::ResultSet res;
+    const auto start = std::chrono::steady_clock::now();
+    if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
+      std::cout << status.GetMessage() << std::endl;
     }
+    const auto end = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> diff = end - start;
+    std::cout << "Execute : " << std::fixed << std::setprecision(9) << diff
+              << '\n';
   }
 
   std::cout << "Bye.\n";

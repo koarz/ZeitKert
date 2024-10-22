@@ -1,12 +1,16 @@
 #pragma once
 
+#include <format>
 #include <memory>
 #include <string>
 
 namespace DB {
-enum class ErrorCode { OK };
+enum class ErrorCode {
+  OK,
+  CreateError,
+};
 
-class Status {
+class [[nodiscard]] Status {
 public:
   Status() : code_(ErrorCode::OK) {}
 
@@ -48,7 +52,7 @@ public:
   bool ok() const { return code_ == ErrorCode::OK; }
 
   std::string GetMessage() {
-    if (!err_msg_) {
+    if (code_ == ErrorCode::OK) {
       return "OK\n";
     }
     return err_msg_->msg_;
