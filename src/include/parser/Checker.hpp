@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/Instance.hpp"
+#include "common/util/StringUtil.hpp"
 #include "parser/Function.hpp"
 #include "storage/Trie.hpp"
 
@@ -26,10 +27,19 @@ public:
     func_impl_.emplace(function, func_impl);
   }
 
-  bool IsKeyWord(std::string_view keyword) { return keywords_.Exist(keyword); }
+  bool IsKeyWord(std::string &str) {
+    StringUtil::ToUpper(str);
+    return keywords_.Exist(str);
+  }
 
-  bool IsFunction(std::string_view function) {
-    return functions_.Exist(function);
+  bool IsFunction(std::string_view src, std::shared_ptr<Function> func) {
+    std::string str{src};
+    StringUtil::ToUpper(str);
+    if (functions_.Exist(str)) {
+      func = func_impl_[str];
+      return true;
+    }
+    return false;
   }
 
   std::shared_ptr<Function> GetFuncImpl(std::string function) {

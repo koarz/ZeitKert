@@ -17,6 +17,8 @@ public:
   ZeitgeistDB() : context_(std::make_shared<QueryContext>()) {}
 
   Status ExecuteQuery(std::string &query, ResultSet &result_set) {
+    query.pop_back();
+
     Binder binder;
     auto status = binder.Parse(query, context_, result_set);
     if (!status.ok()) {

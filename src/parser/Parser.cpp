@@ -3,6 +3,7 @@
 #include "common/util/StringUtil.hpp"
 #include "parser/SQLStatement.hpp"
 #include <memory>
+#include <string>
 #include <string_view>
 
 namespace DB {
@@ -15,35 +16,29 @@ Parser::Parser() {
 Status Parser::Parse(std::string_view query,
                      std::shared_ptr<QueryContext> context,
                      ResultSet &result_set) {
-  int start{}, end{};
-  std::string query_clone{query};
-  query_clone.pop_back();
-  StringUtil::ToUpper(query_clone);
-  end = query_clone.find(' ');
-  auto sv = std::string_view{query_clone.begin(), query_clone.begin() + end};
-
-  std::shared_ptr<SQLStatement> stmt;
-
+  auto end = query.find(' ');
   auto status = Status::OK();
+  std::string sv{query.begin(), query.begin() + end};
+
   if (checker_.IsKeyWord(sv)) {
     if (sv == "CREATE") {
-      status = ParseCreate(query_clone.substr(end + 1), context, result_set);
+      status = ParseCreate(query.substr(end + 1), context, result_set);
     }
   }
 
   return status;
 }
 
-Status Parser::ParseCreate(std::string &&query,
+Status Parser::ParseCreate(std::string_view query,
                            std::shared_ptr<QueryContext> context,
                            ResultSet &result_set) {
   auto end = query.find(' ');
-  auto sv = std::string_view{query.begin(), query.begin() + end};
-
   auto status = Status::OK();
+  std::string sv{query.begin(), query.begin() + end};
+
   if (checker_.IsKeyWord(sv)) {
     if (sv == "DATABASE") {
-      auto name = query.substr(end + 1);
+      std::string name{query.substr(end + 1)};
       if (StringUtil::IsAlpha(name)) {
         auto disk_manager = context->disk_manager_;
         status = disk_manager->CreateDatabase(name);

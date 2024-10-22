@@ -24,7 +24,8 @@ public:
   Status Parse(std::string_view query, std::shared_ptr<QueryContext> context,
                ResultSet &result_set);
 
-  Status ParseCreate(std::string &&query, std::shared_ptr<QueryContext> context,
+  Status ParseCreate(std::string_view query,
+                     std::shared_ptr<QueryContext> context,
                      ResultSet &result_set);
 };
 } // namespace DB
