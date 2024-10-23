@@ -8,6 +8,7 @@ namespace DB {
 enum class ErrorCode {
   OK,
   CreateError,
+  DatabaseNotExists,
 };
 
 class [[nodiscard]] Status {

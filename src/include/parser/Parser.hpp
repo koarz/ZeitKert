@@ -6,6 +6,7 @@
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/Checker.hpp"
+
 #include <memory>
 #include <string_view>
 
@@ -27,5 +28,8 @@ public:
   Status ParseCreate(std::string_view query,
                      std::shared_ptr<QueryContext> context,
                      ResultSet &result_set);
+
+  Status ParseUse(std::string_view query, std::shared_ptr<QueryContext> context,
+                  ResultSet &result_set);
 };
 } // namespace DB

@@ -1,7 +1,9 @@
 #include "parser/Parser.hpp"
+#include "common/DatabaseInstance.hpp"
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/SQLStatement.hpp"
+
 #include <memory>
 #include <string>
 #include <string_view>
@@ -11,6 +13,8 @@ namespace DB {
 Parser::Parser() {
   checker_.RegisterKeyWord("CREATE");
   checker_.RegisterKeyWord("DATABASE");
+  checker_.RegisterKeyWord("USE");
+  checker_.RegisterKeyWord("SELECT");
 }
 
 Status Parser::Parse(std::string_view query,
@@ -20,9 +24,13 @@ Status Parser::Parse(std::string_view query,
   auto status = Status::OK();
   std::string sv{query.begin(), query.begin() + end};
 
+  // Some simple tasks we do directly in Parser
   if (checker_.IsKeyWord(sv)) {
     if (sv == "CREATE") {
       status = ParseCreate(query.substr(end + 1), context, result_set);
+    }
+    if (sv == "USE") {
+      status = ParseUse(query.substr(end + 1), context, result_set);
     }
   }
 
@@ -42,9 +50,29 @@ Status Parser::ParseCreate(std::string_view query,
       if (StringUtil::IsAlpha(name)) {
         auto disk_manager = context->disk_manager_;
         status = disk_manager->CreateDatabase(name);
+      } else {
+        return Status::Error(
+            ErrorCode::CreateError,
+            "Please use English letters for the database name.");
       }
     }
   }
   return status;
+}
+
+Status Parser::ParseUse(std::string_view query,
+                        std::shared_ptr<QueryContext> context,
+                        ResultSet &result_set) {
+  std::string name{query};
+  if (StringUtil::IsAlpha(name)) {
+    auto disk_manager = context->disk_manager_;
+    auto status = disk_manager->OpenDatabase(name);
+    if (status.ok()) {
+      context->database_ = std::make_shared<Database>(disk_manager->GetPath());
+    }
+    return status;
+  }
+  return Status::Error(ErrorCode::DatabaseNotExists,
+                       std::format("The name {} is not correctly.", name));
 }
 } // namespace DB
