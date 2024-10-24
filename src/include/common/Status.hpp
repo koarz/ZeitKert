@@ -9,6 +9,7 @@ enum class ErrorCode {
   OK,
   CreateError,
   DatabaseNotExists,
+  DropError
 };
 
 class [[nodiscard]] Status {
