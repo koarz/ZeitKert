@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace DB {
-enum class StatementType { CreateDatabase, DropDatabase };
+enum class StatementType { CreateDatabase, DropDatabase, ShowDatabase };
 
 class SQLStatement {
   StatementType type_;

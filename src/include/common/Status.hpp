@@ -5,7 +5,12 @@
 #include <string>
 
 namespace DB {
-enum class ErrorCode { OK, CreateError, DropError };
+enum class ErrorCode {
+  OK,
+  CreateError,
+  DatabaseNotExists,
+  DropError
+};
 
 class [[nodiscard]] Status {
 public:
