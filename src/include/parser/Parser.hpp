@@ -27,5 +27,12 @@ public:
   Status ParseCreate(std::string_view query,
                      std::shared_ptr<QueryContext> context,
                      ResultSet &result_set);
+
+  Status ParseDrop(std::string_view query,
+                   std::shared_ptr<QueryContext> context,
+                   ResultSet &result_set);
+  Status ParseShow(std::string_view query,
+                   std::shared_ptr<QueryContext> context,
+                   ResultSet &result_set);
 };
 } // namespace DB

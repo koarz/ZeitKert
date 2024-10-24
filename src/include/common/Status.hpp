@@ -5,10 +5,7 @@
 #include <string>
 
 namespace DB {
-enum class ErrorCode {
-  OK,
-  CreateError,
-};
+enum class ErrorCode { OK, CreateError, DropError };
 
 class [[nodiscard]] Status {
 public:

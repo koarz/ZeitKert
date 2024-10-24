@@ -15,5 +15,7 @@ public:
     std::filesystem::create_directories(path_);
   }
   Status CreateDatabase(std::string name);
+  Status DropDatabase(std::string &name);
+  Status ShowDatabase();
 };
 } // namespace DB
