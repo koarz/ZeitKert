@@ -44,6 +44,8 @@ int main(int argc, char *argv[]) {
     const auto start = std::chrono::steady_clock::now();
     if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
       std::cout << status.GetMessage() << std::endl;
+    } else {
+      std::cout << "Execute Success" << std::endl;
     }
     const auto end = std::chrono::steady_clock::now();
     const std::chrono::duration<double> diff = end - start;
