@@ -5,6 +5,7 @@
 #include "common/Status.hpp"
 
 #include <filesystem>
+#include <fstream>
 
 namespace DB {
 class DiskManager : public Instance<DiskManager> {
@@ -15,14 +16,16 @@ public:
   DiskManager() : path_(default_databases_dir) {
     std::filesystem::create_directories(path_);
   }
-  
+
   Status CreateDatabase(std::string name);
-  
+
   Status DropDatabase(std::string &name);
-  
+
   Status ShowDatabase();
 
   Status OpenDatabase(std::string name);
+
+  Status CreateTable(std::filesystem::path database, std::string table_meta);
 
   std::filesystem::path GetPath() { return path_; }
 };

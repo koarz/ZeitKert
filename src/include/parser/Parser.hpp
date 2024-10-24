@@ -6,6 +6,7 @@
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/Checker.hpp"
+#include "parser/Lexer.hpp"
 
 #include <memory>
 #include <string_view>
@@ -25,19 +26,18 @@ public:
   Status Parse(std::string_view query, std::shared_ptr<QueryContext> context,
                ResultSet &result_set);
 
-  Status ParseCreate(std::string_view query,
-                     std::shared_ptr<QueryContext> context,
+  Status ParseCreate(Lexer &lexer, std::shared_ptr<QueryContext> context,
                      ResultSet &result_set);
 
-  Status ParseDrop(std::string_view query,
-                   std::shared_ptr<QueryContext> context,
+  Status ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
                    ResultSet &result_set);
-  
-  Status ParseShow(std::string_view query,
-                   std::shared_ptr<QueryContext> context,
+
+  Status ParseShow(Lexer &lexer, std::shared_ptr<QueryContext> context,
                    ResultSet &result_set);
-  
-  Status ParseUse(std::string_view query, std::shared_ptr<QueryContext> context,
+
+  Status ParseUse(Lexer &lexer, std::shared_ptr<QueryContext> context,
                   ResultSet &result_set);
+
+  Status CreateTable(Lexer &lexer, std::shared_ptr<QueryContext> context);
 };
 } // namespace DB

@@ -1,8 +1,8 @@
 #include "storage/disk/DiskManager.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
+
 #include <filesystem>
-#include <iostream>
 #include <mutex>
 
 namespace DB {
@@ -63,7 +63,19 @@ Status DiskManager::OpenDatabase(std::string name) {
     return Status::Error(ErrorCode::DatabaseNotExists,
                          "The database now exists");
   }
-  path_ = path;
+  return Status::OK();
+}
+
+Status DiskManager::CreateTable(std::filesystem::path database,
+                                std::string table_meta) {
+  auto path = database / "meta.json";
+  std::ofstream outFile(path, std::ios::binary);
+
+  // 写入字符串内容，包括空格和换行符
+  outFile.write(table_meta.data(), table_meta.size());
+
+  // 关闭文件
+  outFile.close();
   return Status::OK();
 }
 } // namespace DB
