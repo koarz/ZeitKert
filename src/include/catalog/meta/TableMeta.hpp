@@ -49,7 +49,7 @@ public:
     }
   }
 
-  explicit TableMeta(std::string &table_name,
+  explicit TableMeta(std::string table_name,
                      std::vector<std::shared_ptr<ColumnWithNameType>> &columns)
       : table_name_(std::move(table_name)), columns_(std::move(columns)) {}
 
