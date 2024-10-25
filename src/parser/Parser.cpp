@@ -139,6 +139,7 @@ Status Parser::CreateTable(Lexer &lexer,
     if (token.type == TokenType::ClosingRoundBracket) {
       break;
     }
+    token = lexer.nextToken();
   } while (true);
   return context->database_->CreateTable(table_name, columns);
 }

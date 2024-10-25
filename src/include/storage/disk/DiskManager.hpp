@@ -25,7 +25,7 @@ public:
 
   Status OpenDatabase(std::string name);
 
-  Status CreateTable(std::filesystem::path database, std::string table_meta);
+  Status CreateTable(std::filesystem::path table, std::string table_meta);
 
   std::filesystem::path GetPath() { return path_; }
 };
