@@ -24,7 +24,7 @@ struct StringUtil {
 
   static bool IsAlpha(const std::string &str) {
     return std::all_of(str.begin(), str.end(), [](const char &c) {
-      return static_cast<bool>(isalpha(c));
+      return static_cast<bool>(isalpha(c)) || static_cast<bool>(c == '_');
     });
   }
 
