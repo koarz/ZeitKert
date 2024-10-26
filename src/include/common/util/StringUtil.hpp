@@ -31,6 +31,21 @@ struct StringUtil {
   static void ToUpper(std::string &str) {
     std::for_each(str.begin(), str.end(), [](char &c) { c = toupper(c); });
   }
+
+  static bool IsInteger(std::string &str) {
+    return std::all_of(str.begin(), str.end(),
+                       [](char &c) { return c >= '0' && c <= '9'; });
+  }
+
+  static bool IsFloat(std::string &str) {
+    int point_num{};
+    return std::all_of(str.begin(), str.end(),
+                       [&point_num](char &c) {
+                         return (c >= '0' && c <= '9') ||
+                                (c == '.' && ++point_num);
+                       }) &&
+           point_num == 1;
+  }
 };
 
 } // namespace DB

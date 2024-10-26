@@ -1,13 +1,12 @@
 #include "storage/disk/DiskManager.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
+
 #include <filesystem>
-#include <iostream>
 #include <mutex>
 
 namespace DB {
 Status DiskManager::CreateDatabase(std::string name) {
-  std::unique_lock<std::mutex> lock(latch_);
   auto path = path_ / name;
   try {
     if (!std::filesystem::create_directory(path)) {
@@ -40,30 +39,37 @@ Status DiskManager::DropDatabase(std::string &name) {
 
 Status DiskManager::ShowDatabase() {
   auto path = path_;
-  try {
-    if (!std::filesystem::exists(path)) {
-      return Status::Error(ErrorCode::CreateError, "The Database Is not Exist");
-    }
-    std::vector<ResultSet::Row> result_row;
-    for (const auto &entry : std::filesystem::directory_iterator(path)) {
-      result_row.emplace_back(ResultSet::Row(entry.path().filename()));
-    }
-    ResultSet::PrintResult(result_row, "Database");
-  } catch (const std::filesystem::filesystem_error &e) {
-    return Status::Error(ErrorCode::CreateError,
-                         std::format("Error creating directory: {}", e.what()));
+  if (!std::filesystem::exists(path)) {
+    return Status::Error(ErrorCode::CreateError, "The Database Is not Exist");
   }
+  std::vector<ResultSet::Row> result_row;
+  for (const auto &entry : std::filesystem::directory_iterator(path)) {
+    result_row.emplace_back(ResultSet::Row(entry.path().filename()));
+  }
+  ResultSet::PrintResult(result_row, "Database");
   return Status::OK();
 }
 
 Status DiskManager::OpenDatabase(std::string name) {
-  std::unique_lock<std::mutex> lock(latch_);
   auto path = path_ / name;
   if (!path.has_filename()) {
     return Status::Error(ErrorCode::DatabaseNotExists,
                          "The database now exists");
   }
-  path_ = path;
+  return Status::OK();
+}
+
+Status DiskManager::CreateTable(std::filesystem::path table,
+                                std::string table_meta) {
+  if (!std::filesystem::create_directory(table)) {
+    return Status::Error(ErrorCode::CreateError, "The Table Already Exists");
+  }
+  auto path = table / "meta.json";
+  std::ofstream outFile(path, std::ios::binary);
+
+  outFile.write(table_meta.data(), table_meta.size());
+
+  outFile.close();
   return Status::OK();
 }
 } // namespace DB

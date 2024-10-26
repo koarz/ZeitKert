@@ -1,16 +1,29 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 namespace DB {
-enum class StatementType { CreateDatabase, DropDatabase, ShowDatabase };
+enum class StatementType {
+  INVALID_STATEMENT,
+  CREATE_STATEMENT,
+  SELECT_STATEMENT,
+};
 
 class SQLStatement {
-  StatementType type_;
-  std::vector<std::shared_ptr<SQLStatement>> children_;
+public:
+  static constexpr const StatementType TYPE = StatementType::INVALID_STATEMENT;
 
 public:
-  SQLStatement(StatementType type) : type_(type) {}
+  explicit SQLStatement(StatementType type) : type(type) {}
+  virtual ~SQLStatement() {}
+
+  StatementType type;
+
+protected:
+  SQLStatement(const SQLStatement &other) = default;
+
+public:
 };
 } // namespace DB
