@@ -1,17 +1,12 @@
 #pragma once
 
+#include "common/EnumClass.hpp"
+
 #include <format>
 #include <memory>
 #include <string>
 
 namespace DB {
-enum class ErrorCode {
-  OK,
-  CreateError,
-  DatabaseNotExists,
-  DropError,
-  SyntaxError,
-};
 
 class [[nodiscard]] Status {
 public:

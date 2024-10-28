@@ -18,14 +18,13 @@
 
 namespace DB {
 class TableMeta {
-  static constexpr std::string default_table_meta_name = "table_meta.json";
-
   std::string table_name_;
   std::vector<std::shared_ptr<ColumnWithNameType>> columns_;
   // primary_key
   std::map<std::string, uint> name_map_column_idx_;
 
 public:
+  static constexpr std::string default_table_meta_name = "table_meta.json";
   explicit TableMeta(std::filesystem::path table_path) {
     std::ifstream fs{table_path / default_table_meta_name};
     std::string meta_data((std::istreambuf_iterator<char>(fs)),

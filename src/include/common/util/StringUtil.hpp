@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <regex>
 #include <string>
 
 namespace DB {
@@ -45,6 +46,11 @@ struct StringUtil {
                                 (c == '.' && ++point_num);
                        }) &&
            point_num == 1;
+  }
+
+  static bool ValidName(const std::string &str) {
+    std::regex pattern("^[a-zA-Z0-9_]+$");
+    return std::regex_match(str, pattern);
   }
 };
 

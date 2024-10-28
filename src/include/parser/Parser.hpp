@@ -5,39 +5,32 @@
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
+#include "parser/AST.hpp"
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
+#include "parser/SQLStatement.hpp"
+#include "parser/TokenIterator.hpp"
 
 #include <memory>
 #include <string_view>
+#include <vector>
 
 namespace DB {
 class Parser : public Instance<Parser> {
-  Checker checker_;
-
-protected:
-  std::shared_ptr<Instance<Checker>> GetChecker() {
-    return checker_.GetInstance();
-  }
-
 public:
   Parser();
 
-  Status Parse(std::string_view query, std::shared_ptr<QueryContext> context,
-               ResultSet &result_set);
+  Status Parse(TokenIterator &iterator);
 
-  Status ParseCreate(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                     ResultSet &result_set);
+  Status ParseCreate(TokenIterator &iterator);
+
+  Status ParseUse(TokenIterator &iterator);
+
+  Status ParseShow(TokenIterator &iterator);
 
   Status ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
                    ResultSet &result_set);
 
-  Status ParseShow(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                   ResultSet &result_set);
-
-  Status ParseUse(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                  ResultSet &result_set);
-
-  Status CreateTable(Lexer &lexer, std::shared_ptr<QueryContext> context);
+  ASTPtr tree_{nullptr};
 };
 } // namespace DB

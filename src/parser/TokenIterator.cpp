@@ -1,4 +1,4 @@
-#include "parser/TokenIterator.h"
+#include "parser/TokenIterator.hpp"
 
 namespace DB {
 
