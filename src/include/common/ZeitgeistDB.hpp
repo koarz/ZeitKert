@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/Context.hpp"
+#include "common/EnumClass.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "parser/Binder.hpp"
@@ -13,6 +14,12 @@ namespace DB {
 class ZeitgeistDB {
   std::shared_ptr<QueryContext> context_;
 
+  Status HandleCreateStmt();
+
+  Status HandleUseStmt();
+
+  Status HandleShowStmt();
+
 public:
   ZeitgeistDB() : context_(std::make_shared<QueryContext>()) {}
 
@@ -24,9 +31,35 @@ public:
     if (!status.ok()) {
       return status;
     }
-    if (context_->sql_statement_ != nullptr) {
-      context_->sql_statement_ = nullptr;
+    for (auto &stmt : binder.GetStatements()) {
+      context_->sql_statement_ = stmt;
+      switch (stmt->type) {
+      case StatementType::CREATE_STATEMENT:
+        status = HandleCreateStmt();
+        if (!status.ok()) {
+          goto ExecuteEnd;
+        }
+        continue;
+      case StatementType::USE_STATEMENT:
+        status = HandleUseStmt();
+        if (!status.ok()) {
+          goto ExecuteEnd;
+        }
+        continue;
+      case StatementType::SHOW_STATEMENT:
+        status = HandleShowStmt();
+        if (!status.ok()) {
+          goto ExecuteEnd;
+        }
+        continue;
+      case StatementType::INVALID_STATEMENT:
+      case StatementType::SELECT_STATEMENT: break;
+      }
     }
+
+  ExecuteEnd:
+    context_->sql_statement_ = nullptr;
+
     return status;
   }
 };

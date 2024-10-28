@@ -1,15 +1,12 @@
 #pragma once
 
+#include "common/EnumClass.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <vector>
 
 namespace DB {
-enum class StatementType {
-  INVALID_STATEMENT,
-  CREATE_STATEMENT,
-  SELECT_STATEMENT,
-};
 
 class SQLStatement {
 public:

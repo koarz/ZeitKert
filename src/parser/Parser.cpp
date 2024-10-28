@@ -1,167 +1,127 @@
 #include "parser/Parser.hpp"
 #include "common/DatabaseInstance.hpp"
+#include "common/EnumClass.hpp"
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
+#include "parser/ASTCreateQuery.hpp"
+#include "parser/ASTShowQuery.hpp"
+#include "parser/ASTToken.hpp"
+#include "parser/ASTUseQuery.hpp"
+#include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/SQLStatement.hpp"
+#include "parser/TokenIterator.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
 namespace DB {
 
 Parser::Parser() {
-  checker_.RegisterKeyWord("CREATE");
-  checker_.RegisterKeyWord("DROP");
-  checker_.RegisterKeyWord("SHOW");
-  checker_.RegisterKeyWord("DATABASE");
-  checker_.RegisterKeyWord("DATABASES");
-  checker_.RegisterKeyWord("USE");
-  checker_.RegisterKeyWord("SELECT");
-  checker_.RegisterKeyWord("TABLE");
-  checker_.RegisterKeyWord("INT");
+  Checker::RegisterKeyWord("CREATE");
+  Checker::RegisterKeyWord("DROP");
+  Checker::RegisterKeyWord("SHOW");
+  Checker::RegisterKeyWord("DATABASE");
+  Checker::RegisterKeyWord("DATABASES");
+  Checker::RegisterKeyWord("USE");
+  Checker::RegisterKeyWord("SELECT");
+  Checker::RegisterKeyWord("TABLE");
+  Checker::RegisterKeyWord("TABLES");
+
+  Checker::RegisterType("INT");
 }
 
-Status Parser::Parse(std::string_view query,
-                     std::shared_ptr<QueryContext> context,
-                     ResultSet &result_set) {
-  Lexer lexer(query.begin(), query.end(), 1000);
+Status Parser::Parse(TokenIterator &iterator) {
+  auto token = *iterator;
+  if (token.type != TokenType::BareWord) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "Please check your query first token");
+  }
+  std::string str{token.begin, token.end};
   auto status = Status::OK();
-  auto next_token = lexer.nextToken();
-  std::string sv{next_token.begin, next_token.end};
 
-  // Some simple tasks we do directly in Parser
-  if (checker_.IsKeyWord(sv)) {
-    StringUtil::ToUpper(sv);
-    if (sv == "CREATE") {
-      status = ParseCreate(lexer, context, result_set);
-    }
-    if (sv == "DROP") {
-      status = ParseDrop(lexer, context, result_set);
-    }
-    if (sv == "SHOW") {
-      status = ParseShow(lexer, context, result_set);
-    }
-    if (sv == "USE") {
-      status = ParseUse(lexer, context, result_set);
+  if (Checker::IsKeyWord(str)) {
+    if (str == "CREATE") {
+      status = ParseCreate(iterator);
+    } else if (str == "USE") {
+      status = ParseUse(iterator);
+    } else if (str == "SHOW") {
+      status = ParseShow(iterator);
+    } else if (str == "DROP") {
     }
   }
-
-  return status;
+  return Status::OK();
 }
 
-Status Parser::ParseCreate(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                           ResultSet &result_set) {
-  auto token = lexer.nextToken();
+Status Parser::ParseCreate(TokenIterator &iterator) {
   auto status = Status::OK();
-  while (token.type == TokenType::Whitespace) {
-    token = lexer.nextToken();
-  }
-  std::string sv{token.begin, token.end};
+  while ((++iterator)->type != TokenType::BareWord)
+    ;
+  std::string str{iterator->begin, iterator->end};
 
-  if (checker_.IsKeyWord(sv)) {
-    lexer.nextToken();
-    if (sv == "DATABASE") {
-      token = lexer.nextToken();
-      std::string name{token.begin, token.end};
-      if (StringUtil::IsAlpha(name)) {
-        auto disk_manager = context->disk_manager_;
-        status = disk_manager->CreateDatabase(name);
-      } else {
-        return Status::Error(
-            ErrorCode::CreateError,
-            "Please use English letters for the database name.");
-      }
-    }
-    if (sv == "TABLE") {
-      if (context->database_ == nullptr) {
-        return Status::Error(ErrorCode::CreateError,
-                             "You have not choose database");
-      }
-      status = CreateTable(lexer, context);
-    }
-  }
-  return status;
-}
-
-Status Parser::CreateTable(Lexer &lexer,
-                           std::shared_ptr<QueryContext> context) {
-  Token token = lexer.nextToken();
-  std::string table_name{token.begin, token.end};
-  std::vector<std::shared_ptr<ColumnWithNameType>> columns;
-  token = lexer.nextToken();
-  if (token.type != TokenType::OpeningRoundBracket) {
-    return Status::Error(ErrorCode::SyntaxError, "Your sql have syntax error");
-  }
-  token = lexer.nextToken();
-  do {
-    while (token.type == TokenType::Whitespace) {
-      token = lexer.nextToken();
-    }
-    std::string col_name;
-    if (token.type == TokenType::BareWord) {
-      col_name = std::string{token.begin, token.end};
-    }
-    token = lexer.nextToken();
-    if (token.type != TokenType::Whitespace) {
-      return Status::Error(ErrorCode::SyntaxError,
-                           "Your sql have syntax error");
-    }
-    // type
-    std::string type;
-    token = lexer.nextToken();
-    if (token.type == TokenType::BareWord) {
-      type = std::string{token.begin, token.end};
-      if (!checker_.IsKeyWord(type)) {
+  // table name or database name
+  while ((++iterator)->type != TokenType::BareWord)
+    ;
+  if (Checker::IsKeyWord(str)) {
+    if (str == "DATABASE") {
+      tree_ = std::make_shared<CreateQuery>(
+          CreateType::DATABASE, std::string{iterator->begin, iterator->end});
+    } else if (str == "TABLE") {
+      tree_ = std::make_shared<CreateQuery>(
+          CreateType::TABLE, std::string{iterator->begin, iterator->end});
+      if ((++iterator)->type != TokenType::OpeningRoundBracket) {
         return Status::Error(ErrorCode::SyntaxError,
                              "Your sql have syntax error");
       }
-    } else {
-      return Status::Error(ErrorCode::SyntaxError,
-                           "Your sql have syntax error");
+      std::optional<TokenIterator> begin{++iterator};
+      while ((++iterator)->type != TokenType::ClosingRoundBracket)
+        ;
+      std::optional<TokenIterator> end{iterator};
+      tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
     }
-    /*
-     *  other information
-     */
-
-    ColumnPtr data;
-    std::shared_ptr<ValueType> vtype;
-    if (type == "INT") {
-      data = std::make_shared<ColumnVector<int>>();
-      vtype = std::make_shared<Int>();
-    }
-    auto column = std::make_shared<ColumnWithNameType>(data, col_name, vtype);
-    columns.push_back(column);
-    token = lexer.nextToken();
-    if (token.type == TokenType::ClosingRoundBracket) {
-      break;
-    }
-    token = lexer.nextToken();
-  } while (true);
-  return context->database_->CreateTable(table_name, columns);
+  }
+  return Status::OK();
 }
 
-Status Parser::ParseUse(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                        ResultSet &result_set) {
-  auto token = lexer.nextToken();
-  while (token.type == TokenType::Whitespace) {
-    token = lexer.nextToken();
+Status Parser::ParseUse(TokenIterator &iterator) {
+  while ((++iterator)->type != TokenType::BareWord)
+    ;
+  std::string name{iterator->begin, iterator->end};
+  if (!(++iterator)->isEnd()) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "Please check your database name is correct?");
   }
-  std::string name{token.begin, token.end};
-  if (StringUtil::IsAlpha(name)) {
-    auto disk_manager = context->disk_manager_;
-    auto status = disk_manager->OpenDatabase(name);
-    if (status.ok()) {
-      context->database_ = std::make_shared<Database>(
-          disk_manager->GetPath() / name, disk_manager);
+  tree_ = std::make_shared<UseQuery>(name);
+  return Status::OK();
+}
+
+Status Parser::ParseShow(TokenIterator &iterator) {
+  while ((++iterator)->type != TokenType::BareWord)
+    ;
+  std::string type{iterator->begin, iterator->end};
+  if (!(++iterator)->isEnd()) {
+    goto SYNTAXERROR;
+  }
+  if (Checker::IsKeyWord(type)) {
+    if (type == "DATABASES") {
+      tree_ = std::make_shared<ShowQuery>(ShowType::Databases);
+    } else if (type == "TABLES") {
+      tree_ = std::make_shared<ShowQuery>(ShowType::Tables);
+    } else {
+      goto SYNTAXERROR;
     }
-    return status;
+  } else {
+    goto SYNTAXERROR;
   }
-  return Status::Error(ErrorCode::DatabaseNotExists,
-                       std::format("The name {} is not correctly.", name));
+  return Status::OK();
+
+SYNTAXERROR:
+  return Status::Error(ErrorCode::SyntaxError,
+                       "Your SQL Query have syntax error");
 }
 
 Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
@@ -173,7 +133,7 @@ Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
   auto status = Status::OK();
   std::string sv{token.begin, token.end};
 
-  if (checker_.IsKeyWord(sv)) {
+  if (Checker::IsKeyWord(sv)) {
     if (sv == "DATABASE") {
       lexer.nextToken();
       token = lexer.nextToken();
@@ -187,21 +147,4 @@ Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
   return status;
 }
 
-Status Parser::ParseShow(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                         ResultSet &result_set) {
-  auto token = lexer.nextToken();
-  while (token.type == TokenType::Whitespace) {
-    token = lexer.nextToken();
-  }
-  auto status = Status::OK();
-  std::string sv{token.begin, token.end};
-
-  if (checker_.IsKeyWord(sv)) {
-    if (sv == "DATABASES") {
-      auto disk_manager = context->disk_manager_;
-      status = disk_manager->ShowDatabase();
-    }
-  }
-  return status;
-}
 } // namespace DB

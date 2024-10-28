@@ -1,4 +1,5 @@
 #include "storage/disk/DiskManager.hpp"
+#include "catalog/meta/TableMeta.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 
@@ -54,7 +55,7 @@ Status DiskManager::OpenDatabase(std::string name) {
   auto path = path_ / name;
   if (!path.has_filename()) {
     return Status::Error(ErrorCode::DatabaseNotExists,
-                         "The database now exists");
+                         "The database not exists");
   }
   return Status::OK();
 }
@@ -64,7 +65,7 @@ Status DiskManager::CreateTable(std::filesystem::path table,
   if (!std::filesystem::create_directory(table)) {
     return Status::Error(ErrorCode::CreateError, "The Table Already Exists");
   }
-  auto path = table / "meta.json";
+  auto path = table / TableMeta::default_table_meta_name;
   std::ofstream outFile(path, std::ios::binary);
 
   outFile.write(table_meta.data(), table_meta.size());
