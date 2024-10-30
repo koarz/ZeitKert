@@ -5,6 +5,7 @@
 #include "parser/statement/ShowStmt.hpp"
 #include "parser/statement/UseStmt.hpp"
 #include "storage/disk/DiskManager.hpp"
+
 #include <memory>
 
 namespace DB {
@@ -14,7 +15,7 @@ Status ZeitgeistDB::HandleCreateStmt() {
   auto name = create_stmt.GetName();
   if (create_stmt.GetCreateType() == CreateType::TABLE) {
     if (context_->database_ == nullptr) {
-      return Status::Error(ErrorCode::CreateError,
+      return Status::Error(ErrorCode::NotChoiceDatabase,
                            "You have not choice a database");
     }
     return context_->database_->CreateTable(name, create_stmt.GetColumns());
@@ -43,7 +44,13 @@ Status ZeitgeistDB::HandleShowStmt() {
   case ShowType::Databases:
     status = context_->disk_manager_->ShowDatabase();
     break;
-  case ShowType::Tables: break;
+  case ShowType::Tables:
+    if (context_->database_ == nullptr) {
+      return Status::Error(ErrorCode::NotChoiceDatabase,
+                           "You have not choice a database");
+    }
+    status = context_->database_->ShowTables();
+    break;
   }
   return status;
 }

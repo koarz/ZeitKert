@@ -11,6 +11,7 @@ enum class ErrorCode {
   DropError,
   SyntaxError,
   BindError,
+  NotChoiceDatabase,
 };
 
 enum class StatementType {
