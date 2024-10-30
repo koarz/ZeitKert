@@ -18,7 +18,7 @@
 namespace DB {
 class Parser : public Instance<Parser> {
 public:
-  Parser();
+  Parser() = default;
 
   Status Parse(TokenIterator &iterator);
 

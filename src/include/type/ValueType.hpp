@@ -6,7 +6,7 @@ namespace DB {
 struct ValueType {
   using uint = unsigned int;
 
-  enum class Type { Int, Null };
+  enum class Type { Int, Null, String, Varchar, Double };
 
   virtual Type GetType() { return type_; }
   virtual uint GetSize() { return size_; }
@@ -19,6 +19,6 @@ struct ValueType {
 
 private:
   Type type_;
-  uint size_;
+  uint size_{};
 };
 } // namespace DB

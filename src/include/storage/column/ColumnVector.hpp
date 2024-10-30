@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/column/Column.hpp"
+
 #include <vector>
 
 namespace DB {

@@ -21,20 +21,6 @@
 
 namespace DB {
 
-Parser::Parser() {
-  Checker::RegisterKeyWord("CREATE");
-  Checker::RegisterKeyWord("DROP");
-  Checker::RegisterKeyWord("SHOW");
-  Checker::RegisterKeyWord("DATABASE");
-  Checker::RegisterKeyWord("DATABASES");
-  Checker::RegisterKeyWord("USE");
-  Checker::RegisterKeyWord("SELECT");
-  Checker::RegisterKeyWord("TABLE");
-  Checker::RegisterKeyWord("TABLES");
-
-  Checker::RegisterType("INT");
-}
-
 Status Parser::Parse(TokenIterator &iterator) {
   auto token = *iterator;
   if (token.type != TokenType::BareWord) {

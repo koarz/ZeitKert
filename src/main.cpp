@@ -8,8 +8,12 @@
 #include "common/ZeitgeistDB.hpp"
 #include "common/util/StringUtil.hpp"
 #include "linenoise.h"
+#include "parser/Checker.hpp"
+
+void CheckerRegister();
 
 int main(int argc, char *argv[]) {
+  CheckerRegister();
   DB::ZeitgeistDB db;
 
   linenoiseHistorySetMaxLen(1024);
@@ -40,6 +44,8 @@ int main(int argc, char *argv[]) {
       break;
     }
 
+    std::cout << '\n';
+
     DB::ResultSet res;
     const auto start = std::chrono::steady_clock::now();
     if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
@@ -50,9 +56,27 @@ int main(int argc, char *argv[]) {
     const auto end = std::chrono::steady_clock::now();
     const std::chrono::duration<double> diff = end - start;
     std::cout << "Execute : " << std::fixed << std::setprecision(9) << diff
-              << '\n';
+              << "\n\n";
   }
 
   std::cout << "Bye.\n";
   return 0;
+}
+
+void CheckerRegister() {
+  using Checker = DB::Checker;
+  Checker::RegisterKeyWord("CREATE");
+  Checker::RegisterKeyWord("DROP");
+  Checker::RegisterKeyWord("SHOW");
+  Checker::RegisterKeyWord("DATABASE");
+  Checker::RegisterKeyWord("DATABASES");
+  Checker::RegisterKeyWord("USE");
+  Checker::RegisterKeyWord("SELECT");
+  Checker::RegisterKeyWord("TABLE");
+  Checker::RegisterKeyWord("TABLES");
+
+  Checker::RegisterType("INT");
+  // Checker::RegisterType("Varchar");
+  Checker::RegisterType("STRING");
+  Checker::RegisterType("DOUBLE");
 }
