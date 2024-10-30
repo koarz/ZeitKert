@@ -10,9 +10,12 @@
 #include "parser/statement/ShowStmt.hpp"
 #include "parser/statement/UseStmt.hpp"
 #include "storage/column/Column.hpp"
+#include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
+#include "type/Double.hpp"
 #include "type/Int.hpp"
+#include "type/String.hpp"
 
 #include <memory>
 #include <vector>
@@ -51,6 +54,12 @@ std::shared_ptr<CreateStmt> Transform::TransCreateQuery(ASTPtr node) {
         if (var_type == "INT") {
           column = std::make_shared<ColumnVector<int>>();
           type = std::make_shared<Int>();
+        } else if (var_type == "STRING") {
+          column = std::make_shared<ColumnString>();
+          type = std::make_shared<String>();
+        } else if (var_type == "DOUBLE") {
+          column = std::make_shared<ColumnVector<double>>();
+          type = std::make_shared<Double>();
         } else {
           return nullptr;
         }
