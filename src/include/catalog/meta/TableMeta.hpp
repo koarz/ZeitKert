@@ -1,9 +1,12 @@
 #pragma once
 
 #include "simdjson.h"
+#include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
+#include "type/Double.hpp"
 #include "type/Int.hpp"
+#include "type/String.hpp"
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -44,6 +47,16 @@ public:
             std::make_shared<ColumnVector<int>>(), std::string(name),
             std::make_shared<Int>()));
         name_map_column_idx_.emplace(name, idx++);
+      } else if (type == "string") {
+        columns_.push_back(std::make_shared<ColumnWithNameType>(
+            std::make_shared<ColumnString>(), std::string(name),
+            std::make_shared<String>()));
+        name_map_column_idx_.emplace(name, idx++);
+      } else if (type == "double") {
+        columns_.push_back(std::make_shared<ColumnWithNameType>(
+            std::make_shared<ColumnVector<double>>(), std::string(name),
+            std::make_shared<Double>()));
+        name_map_column_idx_.emplace(name, idx++);
       }
     }
   }
@@ -81,5 +94,7 @@ public:
   std::shared_ptr<ColumnWithNameType> GetColumn(std::string &col_name) {
     return columns_[name_map_column_idx_[col_name]];
   }
+
+  std::string GetTableName() { return table_name_; }
 };
 } // namespace DB

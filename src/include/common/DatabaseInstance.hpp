@@ -18,11 +18,12 @@ class Database : public Instance<Database> {
 
 public:
   explicit Database(std::filesystem::path path,
-                    std::shared_ptr<DiskManager> disk_manager)
-      : path_(path), disk_manager_(disk_manager) {}
+                    std::shared_ptr<DiskManager> disk_manager);
 
   Status CreateTable(std::string &table_name,
                      std::vector<std::shared_ptr<ColumnWithNameType>> &columns);
+
+  Status ShowTables();
 };
 
 } // namespace DB
