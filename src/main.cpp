@@ -51,12 +51,12 @@ int main(int argc, char *argv[]) {
     DB::ResultSet res;
     const auto start = std::chrono::steady_clock::now();
     if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
-      std::cout << status.GetMessage() << "\n\n";
+      std::cout << status.GetMessage() << "\n";
     }
     const auto end = std::chrono::steady_clock::now();
     res.schema_->PrintColumns();
     const std::chrono::duration<double> diff = end - start;
-    std::cout << "Time : " << std::fixed << std::setprecision(9) << diff
+    std::cout << "\nTime : " << std::fixed << std::setprecision(9) << diff
               << "\n\n";
   }
 
