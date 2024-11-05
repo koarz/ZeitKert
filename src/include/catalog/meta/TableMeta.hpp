@@ -81,7 +81,7 @@ public:
       writer.Key("name");
       writer.String(column->name_.c_str());
       writer.Key("type");
-      writer.String(column->type_->GetString().c_str());
+      writer.String(column->type_->ToString().c_str());
       writer.EndObject();
     }
 

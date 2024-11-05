@@ -31,6 +31,8 @@ public:
   Status ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
                    ResultSet &result_set);
 
+  Status ParseSelect(TokenIterator &iterator);
+
   ASTPtr tree_{nullptr};
 };
 } // namespace DB

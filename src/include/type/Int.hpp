@@ -7,6 +7,6 @@ class Int final : public ValueType {
 public:
   Int() : ValueType(Type::Int, sizeof(int)) {}
 
-  std::string GetString() override { return "int"; }
+  std::string ToString() override { return "int"; }
 };
 } // namespace DB

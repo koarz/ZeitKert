@@ -7,6 +7,6 @@ class Double final : public ValueType {
 public:
   Double() : ValueType(Type::Double, sizeof(double)) {}
 
-  std::string GetString() override { return "double"; }
+  std::string ToString() override { return "double"; }
 };
 } // namespace DB

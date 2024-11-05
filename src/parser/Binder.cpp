@@ -32,6 +32,9 @@ Status Binder::Parse(std::string_view query,
   case ASTNodeType::ShowQuery:
     statement = Transform::TransShowQuery(parser_.tree_);
     break;
+  case ASTNodeType::SelectQuery:
+    statement = Transform::TransSelectQuery(parser_.tree_);
+    break;
   default: break;
   }
   if (statement == nullptr) {

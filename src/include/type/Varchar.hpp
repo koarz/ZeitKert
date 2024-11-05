@@ -10,7 +10,7 @@ class Varchar final : public ValueType {
 public:
   Varchar(size_t size) : ValueType(Type::Varchar, size) {}
 
-  std::string GetString() override {
+  std::string ToString() override {
     return std::format("varchar({})", GetSize());
   }
 };

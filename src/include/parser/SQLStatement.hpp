@@ -10,9 +10,6 @@ namespace DB {
 
 class SQLStatement {
 public:
-  static constexpr const StatementType TYPE = StatementType::INVALID_STATEMENT;
-
-public:
   explicit SQLStatement(StatementType type) : type(type) {}
   virtual ~SQLStatement() {}
 
@@ -20,7 +17,5 @@ public:
 
 protected:
   SQLStatement(const SQLStatement &other) = default;
-
-public:
 };
 } // namespace DB

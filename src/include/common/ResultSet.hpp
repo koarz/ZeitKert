@@ -1,5 +1,7 @@
 #pragma once
 
+#include "catalog/Schema.hpp"
+
 #include <iomanip>
 #include <iostream>
 #include <ostream>
@@ -38,5 +40,7 @@ public:
 
     std::cout << "+" << std::string(maxWidth + 2, '-') << "+" << std::endl;
   }
+
+  SchemaRef schema_;
 };
 } // namespace DB

@@ -2,6 +2,7 @@
 
 #include "parser/AST.hpp"
 #include "parser/statement/CreateStmt.hpp"
+#include "parser/statement/SelectStmt.hpp"
 #include "parser/statement/ShowStmt.hpp"
 #include "parser/statement/UseStmt.hpp"
 
@@ -13,5 +14,7 @@ struct Transform {
   static std::shared_ptr<UseStmt> TransUseQuery(ASTPtr node);
 
   static std::shared_ptr<ShowStmt> TransShowQuery(ASTPtr node);
+
+  static std::shared_ptr<SelectStmt> TransSelectQuery(ASTPtr node);
 };
 } // namespace DB

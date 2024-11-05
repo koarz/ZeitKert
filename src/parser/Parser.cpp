@@ -1,23 +1,19 @@
 #include "parser/Parser.hpp"
-#include "common/DatabaseInstance.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
+#include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
 #include "parser/ASTToken.hpp"
 #include "parser/ASTUseQuery.hpp"
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
-#include "parser/SQLStatement.hpp"
 #include "parser/TokenIterator.hpp"
-#include "storage/column/ColumnVector.hpp"
-#include "storage/column/ColumnWithNameType.hpp"
 
 #include <memory>
 #include <optional>
 #include <string>
-#include <string_view>
 
 namespace DB {
 
@@ -38,9 +34,15 @@ Status Parser::Parse(TokenIterator &iterator) {
     } else if (str == "SHOW") {
       status = ParseShow(iterator);
     } else if (str == "DROP") {
+    } else if (str == "SELECT") {
+      status = ParseSelect(iterator);
     }
+  } else {
+    status = Status::Error(
+        ErrorCode::SyntaxError,
+        "ZeitgeistDB Just Support CREATE, USE, SHOW, DROP, SELECT Query");
   }
-  return Status::OK();
+  return status;
 }
 
 Status Parser::ParseCreate(TokenIterator &iterator) {
@@ -108,6 +110,17 @@ Status Parser::ParseShow(TokenIterator &iterator) {
 SYNTAXERROR:
   return Status::Error(ErrorCode::SyntaxError,
                        "Your SQL Query have syntax error");
+}
+
+Status Parser::ParseSelect(TokenIterator &iterator) {
+  tree_ = std::make_shared<SelectQuery>();
+  std::optional<TokenIterator> begin{++iterator};
+  // we dont support from order by...query now, so just
+  while (!(++iterator)->isEnd())
+    ;
+  std::optional<TokenIterator> end{iterator};
+  tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
+  return Status::OK();
 }
 
 Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,

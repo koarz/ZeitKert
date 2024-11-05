@@ -4,7 +4,9 @@
 #include "common/EnumClass.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
+#include "execution/ExecutionEngine.hpp"
 #include "parser/Binder.hpp"
+#include "planner/Planner.hpp"
 
 #include <memory>
 #include <string>
@@ -27,6 +29,9 @@ public:
     query.pop_back();
 
     Binder binder;
+    Planner planner(context_);
+    ExecutionEngine executor;
+
     auto status = binder.Parse(query, context_, result_set);
     if (!status.ok()) {
       return status;
@@ -57,6 +62,15 @@ public:
       }
     }
 
+    status = planner.QueryPlan();
+    if (!status.ok()) {
+      goto ExecuteEnd;
+    }
+    status = executor.Execute(planner.GetPlan());
+    if (!status.ok()) {
+      goto ExecuteEnd;
+    }
+    result_set.schema_ = planner.GetPlan()->GetSchemaRef();
   ExecuteEnd:
     context_->sql_statement_ = nullptr;
 

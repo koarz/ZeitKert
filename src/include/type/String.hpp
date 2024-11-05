@@ -8,6 +8,6 @@ public:
   String() : ValueType(Type::String) {}
 
   bool IsVariableSize() override { return true; }
-  std::string GetString() override { return "string"; }
+  std::string ToString() override { return "string"; }
 };
 } // namespace DB

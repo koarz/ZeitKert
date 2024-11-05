@@ -28,10 +28,37 @@ enum class ASTNodeType {
   UseQuery,
   ShowQuery,
   DropQuery,
+  SelectQuery,
+  ColumnRef,
+  TableRef,
   Token,
 };
 
 enum class ShowType {
   Databases,
   Tables,
+};
+
+enum class BindExpressType {
+  BindConstant,
+};
+
+enum class PlanType {
+  SeqScan,
+  IndexScan,
+  Insert,
+  Update,
+  Delete,
+  Aggregation,
+  Limit,
+  NestedLoopJoin,
+  NestedIndexJoin,
+  HashJoin,
+  Filter,
+  Values,
+  Projection,
+  Sort,
+  TopN,
+  MockScan,
+  InitCheck
 };

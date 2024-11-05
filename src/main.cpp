@@ -21,12 +21,12 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Welcome to ZeitgeistDB!\n\n";
 
-  auto prompt = "ZeitgeistDB > ";
+  auto prompt = "DB > ";
   while (true) {
     std::string query;
     bool first_line = true;
     while (true) {
-      auto line_prompt = first_line ? prompt : "        ... > ";
+      auto line_prompt = first_line ? prompt : ".. > ";
       char *query_c_str = linenoise(line_prompt);
       if (query_c_str == nullptr) {
         return 0;
@@ -44,18 +44,19 @@ int main(int argc, char *argv[]) {
       break;
     }
 
+    linenoiseHistoryAdd(query.c_str());
+
     std::cout << '\n';
 
     DB::ResultSet res;
     const auto start = std::chrono::steady_clock::now();
     if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
-      std::cout << status.GetMessage() << std::endl;
-    } else {
-      std::cout << "Execute Success" << std::endl;
+      std::cout << status.GetMessage() << "\n\n";
     }
     const auto end = std::chrono::steady_clock::now();
+    res.schema_->PrintColumns();
     const std::chrono::duration<double> diff = end - start;
-    std::cout << "Execute : " << std::fixed << std::setprecision(9) << diff
+    std::cout << "Time : " << std::fixed << std::setprecision(9) << diff
               << "\n\n";
   }
 
@@ -74,6 +75,7 @@ void CheckerRegister() {
   Checker::RegisterKeyWord("SELECT");
   Checker::RegisterKeyWord("TABLE");
   Checker::RegisterKeyWord("TABLES");
+  Checker::RegisterKeyWord("SELECT");
 
   Checker::RegisterType("INT");
   // Checker::RegisterType("Varchar");
