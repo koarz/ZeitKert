@@ -35,20 +35,20 @@ Status ZeitgeistDB::HandleUseStmt() {
   return status;
 }
 
-Status ZeitgeistDB::HandleShowStmt() {
+Status ZeitgeistDB::HandleShowStmt(ResultSet &result_set) {
   auto &show_stmt = dynamic_cast<ShowStmt &>(*context_->sql_statement_);
   auto show_type = show_stmt.GetShowType();
   Status status;
   switch (show_type) {
   case ShowType::Databases:
-    status = context_->disk_manager_->ShowDatabase();
+    status = context_->disk_manager_->ShowDatabase(result_set);
     break;
   case ShowType::Tables:
     if (context_->database_ == nullptr) {
       return Status::Error(ErrorCode::NotChoiceDatabase,
                            "You have not choice a database");
     }
-    status = context_->database_->ShowTables();
+    status = context_->database_->ShowTables(result_set);
     break;
   }
   return status;

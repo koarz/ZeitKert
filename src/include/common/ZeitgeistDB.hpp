@@ -20,7 +20,7 @@ class ZeitgeistDB {
 
   Status HandleUseStmt();
 
-  Status HandleShowStmt();
+  Status HandleShowStmt(ResultSet &result_set);
 
 public:
   ZeitgeistDB() : context_(std::make_shared<QueryContext>()) {}
@@ -41,22 +41,13 @@ public:
       switch (stmt->type) {
       case StatementType::CREATE_STATEMENT:
         status = HandleCreateStmt();
-        if (!status.ok()) {
-          goto ExecuteEnd;
-        }
-        continue;
+        goto ExecuteEnd;
       case StatementType::USE_STATEMENT:
         status = HandleUseStmt();
-        if (!status.ok()) {
-          goto ExecuteEnd;
-        }
-        continue;
+        goto ExecuteEnd;
       case StatementType::SHOW_STATEMENT:
-        status = HandleShowStmt();
-        if (!status.ok()) {
-          goto ExecuteEnd;
-        }
-        continue;
+        status = HandleShowStmt(result_set);
+        goto ExecuteEnd;
       case StatementType::INVALID_STATEMENT:
       case StatementType::SELECT_STATEMENT: break;
       }

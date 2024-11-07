@@ -2,12 +2,15 @@
 
 #include "common/Config.hpp"
 #include "common/Instance.hpp"
+#include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 
 #include <filesystem>
 #include <fstream>
 
 namespace DB {
+class QueryContext;
+
 class DiskManager : public Instance<DiskManager> {
   std::filesystem::path path_;
   std::mutex latch_;
@@ -21,7 +24,7 @@ public:
 
   Status DropDatabase(std::string &name);
 
-  Status ShowDatabase();
+  Status ShowDatabase(ResultSet &result_set);
 
   Status OpenDatabase(std::string name);
 

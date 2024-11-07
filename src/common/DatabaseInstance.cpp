@@ -1,7 +1,10 @@
 #include "common/DatabaseInstance.hpp"
+#include "catalog/Schema.hpp"
 #include "catalog/meta/TableMeta.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
+#include "storage/column/ColumnString.hpp"
+#include "storage/column/ColumnWithNameType.hpp"
 
 #include <memory>
 
@@ -24,12 +27,15 @@ Status Database::CreateTable(
                                     table_metas_.rbegin()->second->Serialize());
 }
 
-Status Database::ShowTables() {
-  std::vector<ResultSet::Row> result_row;
+Status Database::ShowTables(ResultSet &result_set) {
+  result_set.schema_ = std::make_shared<Schema>();
+  auto col = std::make_shared<ColumnString>();
   for (const auto &entry : table_metas_) {
-    result_row.emplace_back(ResultSet::Row(entry.first));
+    col->Insert(std::string{entry.first});
   }
-  ResultSet::PrintResult(result_row, "Database");
+  result_set.schema_->GetColumns().push_back(
+      std::make_shared<ColumnWithNameType>(col, "Tables",
+                                           std::make_shared<String>()));
   return Status::OK();
 }
 } // namespace DB

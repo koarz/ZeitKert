@@ -38,16 +38,19 @@ Status DiskManager::DropDatabase(std::string &name) {
   return Status::OK();
 }
 
-Status DiskManager::ShowDatabase() {
+Status DiskManager::ShowDatabase(ResultSet &result_set) {
   auto path = path_;
   if (!std::filesystem::exists(path)) {
     return Status::Error(ErrorCode::CreateError, "The Database Is not Exist");
   }
-  std::vector<ResultSet::Row> result_row;
+  result_set.schema_ = std::make_shared<Schema>();
+  auto col = std::make_shared<ColumnString>();
   for (const auto &entry : std::filesystem::directory_iterator(path)) {
-    result_row.emplace_back(ResultSet::Row(entry.path().filename()));
+    col->Insert(std::string{entry.path().filename()});
   }
-  ResultSet::PrintResult(result_row, "Database");
+  result_set.schema_->GetColumns().push_back(
+      std::make_shared<ColumnWithNameType>(col, "Databases",
+                                           std::make_shared<String>()));
   return Status::OK();
 }
 

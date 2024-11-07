@@ -3,6 +3,7 @@
 #include "catalog/meta/TableMeta.hpp"
 #include "common/Config.hpp"
 #include "common/Instance.hpp"
+#include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "storage/disk/DiskManager.hpp"
 
@@ -23,7 +24,7 @@ public:
   Status CreateTable(std::string &table_name,
                      std::vector<std::shared_ptr<ColumnWithNameType>> &columns);
 
-  Status ShowTables();
+  Status ShowTables(ResultSet &result_set);
 };
 
 } // namespace DB
