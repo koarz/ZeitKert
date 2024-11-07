@@ -15,3 +15,9 @@ show tables;
 ```sql
 use test;
 ```
+
+# Select
+1. Select Constant, It Will Create Some Columns (After Support ColumnConst Would Store Column Into ColumnConst)
+```sql
+select 1, 2.0, '3';
+```
