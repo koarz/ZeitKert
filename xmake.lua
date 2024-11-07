@@ -15,9 +15,7 @@ target("ZeitgeistDB")
 target("tests")
     set_kind("binary")
     add_files("src/**.cpp|main.cpp")
-
     add_files("tests/**.cpp")
-
     add_packages("linenoise", "simdjson", "rapidjson", "gtest")
 
 set_default("ZeitgeistDB")
