@@ -2,6 +2,7 @@
 
 #include "storage/column/Column.hpp"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -12,18 +13,30 @@ public:
   bool IsConstColumn() override { return false; }
   bool IsNullable() override { return true; }
 
-  void Insert(T v) { data_.push_back(v); }
+  void Insert(T v) {
+    element_str_.push_back(std::to_string(v));
+    if (element_str_.rbegin()->size() > max_element_size_) {
+      max_element_size_ = element_str_.rbegin()->size();
+    }
+    data_.push_back(v);
+  }
 
   std::string GetStrElement(size_t idx) override {
     if (idx >= data_.size()) {
       return "Null";
     }
-    return std::to_string(data_[idx]);
+    return element_str_[idx];
   }
 
   size_t Size() override { return data_.size(); }
 
-protected:
+  size_t GetMaxElementSize() { return max_element_size_; }
+
+private:
+  size_t max_element_size_{};
+
   std::vector<T> data_;
+
+  std::vector<std::string> element_str_;
 };
 } // namespace DB
