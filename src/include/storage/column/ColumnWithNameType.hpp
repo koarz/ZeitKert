@@ -30,6 +30,10 @@ public:
 
   ColumnPtr GetColumn() { return column_; }
 
+  size_t GetMaxElementSize() {
+    return std::max(name_.size(), column_->GetMaxElementSize());
+  }
+
   size_t Size() { return column_->Size(); }
 };
 using ColumnWithNameTypeRef = std::shared_ptr<ColumnWithNameType>;
