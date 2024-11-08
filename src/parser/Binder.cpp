@@ -22,23 +22,25 @@ Status Binder::Parse(std::string_view query,
     return status;
   }
   std::shared_ptr<SQLStatement> statement;
+  std::string message;
   switch (parser_.tree_->GetNodeType()) {
   case ASTNodeType::CreateQuery:
-    statement = Transform::TransCreateQuery(parser_.tree_);
+    statement = Transform::TransCreateQuery(parser_.tree_, message);
     break;
   case ASTNodeType::UseQuery:
-    statement = Transform::TransUseQuery(parser_.tree_);
+    statement = Transform::TransUseQuery(parser_.tree_, message);
     break;
   case ASTNodeType::ShowQuery:
-    statement = Transform::TransShowQuery(parser_.tree_);
+    statement = Transform::TransShowQuery(parser_.tree_, message);
     break;
   case ASTNodeType::SelectQuery:
-    statement = Transform::TransSelectQuery(parser_.tree_);
+    statement = Transform::TransSelectQuery(parser_.tree_, message);
     break;
   default: break;
   }
   if (statement == nullptr) {
-    return Status::Error(ErrorCode::BindError, "Parse tree is invalid");
+    return Status::Error(ErrorCode::BindError,
+                         "Binder suffer error: " + message);
   }
   statements_.push_back(statement);
   return Status::OK();

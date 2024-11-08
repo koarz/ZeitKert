@@ -9,7 +9,7 @@
 
 namespace DB {
 struct BoundConstant : public BoundExpress {
-  BoundConstant() : BoundExpress(BindExpressType::BindConstant) {}
+  BoundConstant() : BoundExpress(BoundExpressType::BoundConstant) {}
   ~BoundConstant() override = default;
 
   union {

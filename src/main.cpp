@@ -1,12 +1,14 @@
 #include <chrono>
 #include <cstddef>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "common/ZeitgeistDB.hpp"
 #include "common/util/StringUtil.hpp"
+#include "function/Abs.hpp"
 #include "linenoise.h"
 #include "parser/Checker.hpp"
 
@@ -83,4 +85,6 @@ void CheckerRegister() {
   // Checker::RegisterType("Varchar");
   Checker::RegisterType("STRING");
   Checker::RegisterType("DOUBLE");
+
+  Checker::RegisterFunction("ABS", std::make_shared<DB::FunctionAbs>());
 }

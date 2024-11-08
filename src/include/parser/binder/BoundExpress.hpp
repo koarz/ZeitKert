@@ -5,10 +5,10 @@
 
 namespace DB {
 struct BoundExpress {
-  BoundExpress(BindExpressType expr_type) : expr_type_(expr_type) {}
+  BoundExpress(BoundExpressType expr_type) : expr_type_(expr_type) {}
   virtual ~BoundExpress() = default;
 
-  BindExpressType expr_type_;
+  BoundExpressType expr_type_;
 };
 using BoundExpressRef = std::shared_ptr<BoundExpress>;
 } // namespace DB

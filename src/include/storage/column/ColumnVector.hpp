@@ -30,7 +30,9 @@ public:
 
   size_t Size() override { return data_.size(); }
 
-  size_t GetMaxElementSize() { return max_element_size_; }
+  size_t GetMaxElementSize() override { return max_element_size_; }
+
+  T &operator[](size_t idx) { return data_[idx]; }
 
 private:
   size_t max_element_size_{};
