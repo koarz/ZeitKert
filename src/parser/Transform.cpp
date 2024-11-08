@@ -131,6 +131,23 @@ BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
     return GetColumnExpress(it, end, message);
   }
 
+  if (it->type == TokenType::Minus) {
+    if ((++it)->type == TokenType::Number) {
+      auto number = std::make_shared<BoundConstant>();
+      std::string numstr{it->begin, it->end};
+      if (StringUtil::IsInteger(numstr)) {
+        numstr = "-" + numstr;
+        number->type_ = std::make_shared<Int>();
+        number->value_.i32 = std::stoi(numstr);
+      } else {
+        numstr = "-" + numstr;
+        number->type_ = std::make_shared<Double>();
+        number->value_.f64 = std::stod(numstr);
+      }
+      return number;
+    }
+  }
+
   if (it->type == TokenType::Number) {
     auto number = std::make_shared<BoundConstant>();
     std::string numstr{it->begin, it->end};
