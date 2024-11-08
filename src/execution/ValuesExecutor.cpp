@@ -13,8 +13,7 @@ Status ValuesExecutor::Init() {
 }
 
 Status ValuesExecutor::Execute() {
-  auto schema = plan_.GetSchemaRef();
-  for (auto &v : plan_.values_) {
+  for (auto &v : plan_->values_) {
     auto value = dynamic_cast<BoundConstant &>(*v);
     ColumnPtr col;
     switch (value.type_->GetType()) {
@@ -36,7 +35,7 @@ Status ValuesExecutor::Execute() {
     auto col_name = value.ToString();
     auto column =
         std::make_shared<ColumnWithNameType>(col, col_name, value.type_);
-    schema->GetColumns().push_back(column);
+    schema_->GetColumns().push_back(column);
   }
   return Status::OK();
 }

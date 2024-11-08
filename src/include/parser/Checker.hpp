@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/util/StringUtil.hpp"
-#include "parser/Function.hpp"
+#include "function/Function.hpp"
 #include "storage/Trie.hpp"
 
 #include <map>
@@ -30,7 +30,7 @@ public:
 
   static bool IsKeyWord(std::string &str);
 
-  static bool IsFunction(std::string_view src, std::shared_ptr<Function> func);
+  static bool IsFunction(std::string &src);
 
   static std::shared_ptr<Function> GetFuncImpl(std::string function);
 };

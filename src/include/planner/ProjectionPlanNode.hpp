@@ -10,14 +10,10 @@
 
 namespace DB {
 class ProjectionPlanNode : public AbstractPlanNode {
-  std::vector<BoundExpressRef> select_list_;
-
 public:
   ProjectionPlanNode(SchemaRef schema,
-                     std::vector<AbstractPlanNodeRef> children,
-                     std::vector<BoundExpressRef> select_list)
-      : AbstractPlanNode(schema, std::move(children)),
-        select_list_(std::move(select_list)) {}
+                     std::vector<AbstractPlanNodeRef> children)
+      : AbstractPlanNode(std::move(schema), std::move(children)) {}
   ~ProjectionPlanNode() override = default;
 
   PlanType GetType() const override { return PlanType::Projection; }

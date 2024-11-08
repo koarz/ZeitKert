@@ -2,6 +2,7 @@
 
 #include "storage/column/ColumnWithNameType.hpp"
 #include <cstddef>
+#include <format>
 #include <iostream>
 #include <vector>
 namespace DB {
@@ -20,7 +21,7 @@ public:
     max_elem_size.reserve(column_num);
     for (auto &c : columns_) {
       max_row_num = max_row_num > c->Size() ? max_row_num : c->Size();
-      max_elem_size.emplace_back(c->GetMaxElementSize() + 4);
+      max_elem_size.emplace_back(c->GetMaxElementSize() + 2);
     }
     std::string mid_line{"│"};
     // output top line
@@ -75,6 +76,8 @@ public:
       }
     }
     std::cout << "╯\n";
+    std::cout << std::format("Total Rows: {} Columns: {}\n", max_row_num,
+                             column_num);
   }
 
 private:

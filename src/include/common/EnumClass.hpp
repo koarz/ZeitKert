@@ -31,6 +31,7 @@ enum class ASTNodeType {
   SelectQuery,
   ColumnRef,
   TableRef,
+  Function,
   Token,
 };
 
@@ -39,8 +40,9 @@ enum class ShowType {
   Tables,
 };
 
-enum class BindExpressType {
-  BindConstant,
+enum class BoundExpressType {
+  BoundConstant,
+  BoundFunction,
 };
 
 enum class PlanType {
@@ -56,6 +58,7 @@ enum class PlanType {
   HashJoin,
   Filter,
   Values,
+  Function,
   Projection,
   Sort,
   TopN,

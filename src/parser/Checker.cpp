@@ -31,14 +31,9 @@ bool Checker::IsKeyWord(std::string &str) {
   return keywords_.Exist(str);
 }
 
-bool Checker::IsFunction(std::string_view src, std::shared_ptr<Function> func) {
-  std::string str{src};
+bool Checker::IsFunction(std::string &str) {
   StringUtil::ToUpper(str);
-  if (functions_.Exist(str)) {
-    func = func_impl_[str];
-    return true;
-  }
-  return false;
+  return functions_.Exist(str);
 }
 
 std::shared_ptr<Function> Checker::GetFuncImpl(std::string function) {

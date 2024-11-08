@@ -18,5 +18,7 @@ public:
   Status QueryPlan();
 
   Status PlanSelect(SelectStmt &statement);
+
+  AbstractPlanNodeRef GetPlanNode(BoundExpressRef plan);
 };
 } // namespace DB
