@@ -32,7 +32,7 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
                                            std::move(expr_column));
   }
   case BoundExpressType::BoundFunction: {
-    auto exp = dynamic_cast<BoundFunction &>(*expr);
+    auto &exp = dynamic_cast<BoundFunction &>(*expr);
     for (auto col : exp.GetArguments()) {
       abst_column.push_back(GetPlanNode(col));
     }

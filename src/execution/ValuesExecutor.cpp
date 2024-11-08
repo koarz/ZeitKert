@@ -14,7 +14,7 @@ Status ValuesExecutor::Init() {
 
 Status ValuesExecutor::Execute() {
   for (auto &v : plan_->values_) {
-    auto value = dynamic_cast<BoundConstant &>(*v);
+    auto &value = dynamic_cast<BoundConstant &>(*v);
     ColumnPtr col;
     switch (value.type_->GetType()) {
     case ValueType::Type::Int:

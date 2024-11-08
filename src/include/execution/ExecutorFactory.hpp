@@ -21,7 +21,7 @@ struct ExecutorFactory {
           plan->GetSchemaRef(), std::dynamic_pointer_cast<ValuePlanNode>(plan));
     }
     case PlanType::Function: {
-      auto p = dynamic_cast<FunctionPlanNode &>(*plan);
+      auto &p = dynamic_cast<FunctionPlanNode &>(*plan);
       std::vector<AbstractExecutorRef> children;
       for (auto child : p.GetChildren()) {
         children.push_back(CreateExecutor(child));
@@ -30,7 +30,7 @@ struct ExecutorFactory {
                                                 std::move(children));
     }
     case PlanType::Projection: {
-      auto p = dynamic_cast<ProjectionPlanNode &>(*plan);
+      auto &p = dynamic_cast<ProjectionPlanNode &>(*plan);
       std::vector<AbstractExecutorRef> children;
       for (auto child : p.GetChildren()) {
         children.push_back(CreateExecutor(child));
