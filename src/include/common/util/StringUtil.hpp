@@ -33,6 +33,10 @@ struct StringUtil {
     std::for_each(str.begin(), str.end(), [](char &c) { c = toupper(c); });
   }
 
+  static void ToLower(std::string &str) {
+    std::for_each(str.begin(), str.end(), [](char &c) { c = tolower(c); });
+  }
+
   static bool IsInteger(std::string &str) {
     return std::all_of(str.begin(), str.end(),
                        [](char &c) { return c >= '0' && c <= '9'; });

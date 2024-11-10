@@ -39,6 +39,8 @@ public:
 
   size_t GetMaxElementSize() override { return max_element_size_; }
 
+  std::string operator[](size_t idx) { return GetStrElement(idx); }
+
 private:
   size_t max_element_size_{};
 

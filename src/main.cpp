@@ -9,6 +9,7 @@
 #include "common/ZeitgeistDB.hpp"
 #include "common/util/StringUtil.hpp"
 #include "function/Abs.hpp"
+#include "function/FunctionString.hpp"
 #include "linenoise.h"
 #include "parser/Checker.hpp"
 
@@ -87,4 +88,8 @@ void CheckerRegister() {
   Checker::RegisterType("DOUBLE");
 
   Checker::RegisterFunction("ABS", std::make_shared<DB::FunctionAbs>());
+  Checker::RegisterFunction("TO_UPPER",
+                            std::make_shared<DB::FunctionToUpper>());
+  Checker::RegisterFunction("TO_LOWER",
+                            std::make_shared<DB::FunctionToLower>());
 }
