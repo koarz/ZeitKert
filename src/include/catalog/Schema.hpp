@@ -23,7 +23,7 @@ public:
       max_row_num = max_row_num > c->Size() ? max_row_num : c->Size();
       max_elem_size.emplace_back(c->GetMaxElementSize() + 2);
     }
-    std::string mid_line{"│"};
+    std::string mid_line{"├"};
     // output top line
     std::cout << "╭";
     for (int i = 0; i < column_num; i++) {
