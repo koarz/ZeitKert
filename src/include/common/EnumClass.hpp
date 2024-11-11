@@ -12,6 +12,7 @@ enum class ErrorCode {
   SyntaxError,
   BindError,
   NotChoiceDatabase,
+  IOError,
 };
 
 enum class StatementType {

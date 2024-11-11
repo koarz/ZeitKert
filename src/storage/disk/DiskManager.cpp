@@ -1,8 +1,10 @@
 #include "storage/disk/DiskManager.hpp"
 #include "catalog/meta/TableMeta.hpp"
+#include "common/Config.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 
+#include <cstring>
 #include <filesystem>
 #include <mutex>
 
@@ -74,6 +76,34 @@ Status DiskManager::CreateTable(std::filesystem::path table,
   outFile.write(table_meta.data(), table_meta.size());
 
   outFile.close();
+  return Status::OK();
+}
+
+Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id,
+                             uint8_t *data) {
+  int offset = page_id * DEFAULT_PAGE_SIZE;
+  fs.seekp(offset);
+  fs.read(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
+  if (fs.bad()) {
+    return Status::Error(ErrorCode::IOError, "I/O error when reading page");
+  }
+  int read_count = fs.gcount();
+  if (read_count < DEFAULT_PAGE_SIZE) {
+    fs.clear();
+    memset(data + read_count, 0, DEFAULT_PAGE_SIZE - read_count);
+  }
+  return Status::OK();
+}
+
+Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id,
+                              uint8_t *data) {
+  int offset = page_id * DEFAULT_PAGE_SIZE;
+  fs.seekp(offset);
+  fs.write(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
+  if (fs.bad()) {
+    return Status::Error(ErrorCode::IOError, "I/O error when reading page");
+  }
+  fs.flush();
   return Status::OK();
 }
 } // namespace DB
