@@ -1,9 +1,12 @@
 #pragma once
 
 #include "common/Config.hpp"
+#include <cstdint>
 
 namespace DB {
 class Replacer {
+  friend class BufferPoolManager;
+
 public:
   virtual ~Replacer() = default;
 
@@ -18,5 +21,7 @@ public:
   virtual void Pin(frame_id_t frame_id) = 0;
 
   virtual void UnPin(frame_id_t frame_id) = 0;
+
+  virtual uint64_t GetPinCount(frame_id_t frame_id) = 0;
 };
 } // namespace DB

@@ -36,5 +36,7 @@ public:
   void Pin(frame_id_t frame_id) override;
 
   void UnPin(frame_id_t frame_id) override;
+
+  uint64_t GetPinCount(frame_id_t frame_id) override;
 };
 } // namespace DB

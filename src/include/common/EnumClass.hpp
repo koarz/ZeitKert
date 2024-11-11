@@ -13,6 +13,7 @@ enum class ErrorCode {
   BindError,
   NotChoiceDatabase,
   IOError,
+  BufferPoolError,
 };
 
 enum class StatementType {

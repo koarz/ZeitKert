@@ -2,6 +2,7 @@
 #include "common/Config.hpp"
 
 #include <cstddef>
+#include <cstdint>
 
 namespace DB {
 LRUReplacer::LRUReplacer(size_t frame_num) : frame_num_(frame_num) {
@@ -43,4 +44,8 @@ void LRUReplacer::UnPin(frame_id_t frame_id) {
 }
 
 void LRUReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {}
+
+uint64_t LRUReplacer::GetPinCount(frame_id_t frame_id) {
+  return list_[frame_id].pin_count_;
+}
 } // namespace DB
