@@ -21,7 +21,7 @@ public:
   Slice(const Slice &) = default;
   Slice &operator=(const Slice &) = default;
 
-  std::string Serilize() const { return ToString() + std::to_string(size_); }
+  std::string Serilize() const { return std::to_string(size_) + ToString(); }
 
   size_t Size() const { return size_; }
 
