@@ -14,6 +14,7 @@ enum class ErrorCode {
   NotChoiceDatabase,
   IOError,
   BufferPoolError,
+  NotFound,
 };
 
 enum class StatementType {
