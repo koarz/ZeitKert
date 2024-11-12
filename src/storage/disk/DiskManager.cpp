@@ -3,6 +3,7 @@
 #include "common/Config.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
+#include "storage/column/ColumnString.hpp"
 
 #include <cstring>
 #include <filesystem>

@@ -1,4 +1,5 @@
 #include "parser/Transform.hpp"
+#include "catalog/meta/ColumnMeta.hpp"
 #include "common/EnumClass.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
@@ -35,7 +36,7 @@ std::shared_ptr<CreateStmt> Transform::TransCreateQuery(ASTPtr node,
   auto &create_query = dynamic_cast<CreateQuery &>(*node);
   auto name = create_query.GetName();
   auto type = create_query.GetType();
-  std::vector<std::shared_ptr<ColumnWithNameType>> columns;
+  std::vector<ColumnMetaRef> columns;
   if (type == CreateType::TABLE) {
     auto &node_query = dynamic_cast<ASTToken &>(*create_query.children_[0]);
     auto it = node_query.Begin();
@@ -55,26 +56,21 @@ std::shared_ptr<CreateStmt> Transform::TransCreateQuery(ASTPtr node,
       // we will get all messages of one column
       // tokens[0] is col_name tokens[1] is val type
       // current version not upport others
-      ColumnPtr column;
       std::shared_ptr<ValueType> type;
       auto col_name = std::string{tokens[0].begin, tokens[0].end};
       auto var_type = std::string{tokens[1].begin, tokens[1].end};
       if (Checker::IsType(var_type)) {
         if (var_type == "INT") {
-          column = std::make_shared<ColumnVector<int>>();
           type = std::make_shared<Int>();
         } else if (var_type == "STRING") {
-          column = std::make_shared<ColumnString>();
           type = std::make_shared<String>();
         } else if (var_type == "DOUBLE") {
-          column = std::make_shared<ColumnVector<double>>();
           type = std::make_shared<Double>();
         } else {
           return nullptr;
         }
       }
-      columns.emplace_back(
-          std::make_shared<ColumnWithNameType>(column, col_name, type));
+      columns.emplace_back(std::make_shared<ColumnMeta>(col_name, type, 0));
     }
   }
   return std::make_shared<CreateStmt>(type, name, columns);

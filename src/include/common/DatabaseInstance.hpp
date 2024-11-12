@@ -1,5 +1,6 @@
 #pragma once
 
+#include "catalog/meta/ColumnMeta.hpp"
 #include "catalog/meta/TableMeta.hpp"
 #include "common/Config.hpp"
 #include "common/Instance.hpp"
@@ -22,7 +23,7 @@ public:
                     std::shared_ptr<DiskManager> disk_manager);
 
   Status CreateTable(std::string &table_name,
-                     std::vector<std::shared_ptr<ColumnWithNameType>> &columns);
+                     std::vector<std::shared_ptr<ColumnMeta>> &columns);
 
   Status ShowTables(ResultSet &result_set);
 };

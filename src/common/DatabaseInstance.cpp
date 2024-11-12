@@ -1,5 +1,6 @@
 #include "common/DatabaseInstance.hpp"
 #include "catalog/Schema.hpp"
+#include "catalog/meta/ColumnMeta.hpp"
 #include "catalog/meta/TableMeta.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
@@ -18,11 +19,11 @@ Database::Database(std::filesystem::path path,
   }
 }
 
-Status Database::CreateTable(
-    std::string &table_name,
-    std::vector<std::shared_ptr<ColumnWithNameType>> &columns) {
-  table_metas_.emplace(table_name,
-                       std::make_shared<TableMeta>(table_name, columns));
+Status
+Database::CreateTable(std::string &table_name,
+                      std::vector<std::shared_ptr<ColumnMeta>> &columns) {
+  table_metas_.emplace(
+      table_name, std::make_shared<TableMeta>(table_name, std::move(columns)));
   return disk_manager_->CreateTable(path_ / table_name,
                                     table_metas_.rbegin()->second->Serialize());
 }

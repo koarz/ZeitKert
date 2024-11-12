@@ -1,9 +1,7 @@
 #pragma once
 
+#include "catalog/meta/ColumnMeta.hpp"
 #include "simdjson.h"
-#include "storage/column/ColumnString.hpp"
-#include "storage/column/ColumnVector.hpp"
-#include "storage/column/ColumnWithNameType.hpp"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
 #include "type/String.hpp"
@@ -22,7 +20,7 @@
 namespace DB {
 class TableMeta {
   std::string table_name_;
-  std::vector<std::shared_ptr<ColumnWithNameType>> columns_;
+  std::vector<ColumnMetaRef> columns_;
   // primary_key
   std::map<std::string, uint> name_map_column_idx_;
 
@@ -41,28 +39,26 @@ public:
     for (const auto &column : json["columns"]) {
       auto name = column["name"].get_string().value();
       auto type = column["type"].get_string().value();
+      auto page_num =
+          std::stoull(std::string(column["page_number"].get_string().value()));
       // auto nullable = column["nullable"].get_bool();
       if (type == "int") {
-        columns_.push_back(std::make_shared<ColumnWithNameType>(
-            std::make_shared<ColumnVector<int>>(), std::string(name),
-            std::make_shared<Int>()));
+        columns_.push_back(std::make_shared<ColumnMeta>(
+            std::string(name), std::make_shared<Int>(), page_num));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "string") {
-        columns_.push_back(std::make_shared<ColumnWithNameType>(
-            std::make_shared<ColumnString>(), std::string(name),
-            std::make_shared<String>()));
+        columns_.push_back(std::make_shared<ColumnMeta>(
+            std::string(name), std::make_shared<String>(), page_num));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "double") {
-        columns_.push_back(std::make_shared<ColumnWithNameType>(
-            std::make_shared<ColumnVector<double>>(), std::string(name),
-            std::make_shared<Double>()));
+        columns_.push_back(std::make_shared<ColumnMeta>(
+            std::string(name), std::make_shared<Double>(), page_num));
         name_map_column_idx_.emplace(name, idx++);
       }
     }
   }
 
-  explicit TableMeta(std::string table_name,
-                     std::vector<std::shared_ptr<ColumnWithNameType>> &columns)
+  explicit TableMeta(std::string table_name, std::vector<ColumnMetaRef> columns)
       : table_name_(std::move(table_name)), columns_(std::move(columns)) {}
 
   std::string Serialize() {
@@ -82,6 +78,8 @@ public:
       writer.String(column->name_.c_str());
       writer.Key("type");
       writer.String(column->type_->ToString().c_str());
+      writer.Key("page_number");
+      writer.String(std::to_string(column->page_number_).c_str());
       writer.EndObject();
     }
 
@@ -91,7 +89,7 @@ public:
     return buffer.GetString();
   }
 
-  std::shared_ptr<ColumnWithNameType> GetColumn(std::string &col_name) {
+  ColumnMetaRef GetColumn(std::string &col_name) {
     return columns_[name_map_column_idx_[col_name]];
   }
 
