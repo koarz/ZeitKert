@@ -21,4 +21,9 @@ target("tests")
     add_cxxflags("-fsanitize=address", "-fno-omit-frame-pointer")
     add_packages("linenoise", "simdjson", "rapidjson", "gtest", "fmt")
 
+target("bpm-bench")
+    set_kind("binary")
+    add_files("benchmark/bpm-bench.cpp", "src/**.cpp|main.cpp")
+    add_packages("linenoise", "simdjson", "rapidjson", "fmt")
+
 set_default("ZeitgeistDB")
