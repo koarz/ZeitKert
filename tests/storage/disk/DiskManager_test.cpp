@@ -27,11 +27,16 @@ TEST(DiskManagerTest, ReadWritePageTest) {
   DB::DiskManager dm;
   uint8_t data[DEFAULT_PAGE_SIZE], temp[DEFAULT_PAGE_SIZE];
   RandomData(data, DEFAULT_PAGE_SIZE);
-  EXPECT_TRUE(dm.WritePage(fs, 0, data).ok());
-  EXPECT_TRUE(dm.ReadPage(fs, 0, temp).ok());
-  for (int i = 0; i < DEFAULT_PAGE_SIZE; i++) {
-    EXPECT_EQ(data[i], temp[i]);
+  for (int i = 0; i < 64000; i++) {
+    EXPECT_TRUE(dm.WritePage(fs, i, data).ok());
   }
+  for (int i = 0; i < 64000; i++) {
+    EXPECT_TRUE(dm.ReadPage(fs, i, temp).ok());
+    for (int i = 0; i < DEFAULT_PAGE_SIZE; i++) {
+      EXPECT_EQ(0, memcmp(data, temp, DEFAULT_PAGE_SIZE));
+    }
+  }
+
   fs.close();
   std::filesystem::remove(path);
 }
