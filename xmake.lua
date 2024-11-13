@@ -6,12 +6,12 @@ set_version("0.1")
 add_includedirs("src/include")
 set_toolchains("clang")
 
-add_requires("linenoise", "simdjson", "rapidjson", "gtest")
+add_requires("linenoise", "simdjson", "rapidjson", "gtest", "fmt")
 
 target("ZeitgeistDB")
     set_kind("binary")
     add_files("src/**.cpp")
-    add_packages("linenoise", "simdjson", "rapidjson")
+    add_packages("linenoise", "simdjson", "rapidjson", "fmt")
 
 target("tests")
     set_kind("binary")
@@ -19,6 +19,6 @@ target("tests")
     add_files("tests/**.cpp")
     add_syslinks("asan")
     add_cxxflags("-fsanitize=address", "-fno-omit-frame-pointer")
-    add_packages("linenoise", "simdjson", "rapidjson", "gtest")
+    add_packages("linenoise", "simdjson", "rapidjson", "gtest", "fmt")
 
 set_default("ZeitgeistDB")
