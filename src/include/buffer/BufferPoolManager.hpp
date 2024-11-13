@@ -31,7 +31,7 @@ public:
 
   Status UnPinPage(std::filesystem::path column_path, page_id_t page_id);
 
-  Status FlushPage(std::filesystem::path column_path, page_id_t page_id);
+  Status FlushPage(frame_id_t frame_id);
 
   Status FlushAllPage();
 };

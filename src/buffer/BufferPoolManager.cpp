@@ -32,6 +32,7 @@ Status BufferPoolManager::FetchPage(std::filesystem::path column_path,
   };
   for (int i = 0; i < pool_size_; i++) {
     if (OnPage(pages_ + i)) {
+      page = pages_ + i;
       replacer_->Access(i);
       return Status::OK();
     }
@@ -43,12 +44,10 @@ Status BufferPoolManager::FetchPage(std::filesystem::path column_path,
                          "Buffer pool was full, not page evictable");
   }
   replacer_->Access(evict);
-  lock.unlock();
   page = pages_ + evict;
-  auto page_lock = page->GetWriteLock();
+  auto &fs = path_map_[page->GetPath()];
   Status status = Status::OK();
   if (page->IsDirty()) {
-    auto &fs = path_map_[page->GetPath()];
     if (!fs.is_open()) {
       fs.open(page->GetPath(),
               std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
@@ -61,8 +60,7 @@ Status BufferPoolManager::FetchPage(std::filesystem::path column_path,
   page->page_id_ = page_id;
   page->is_dirty_ = false;
   page->path_ = column_path;
-  status =
-      disk_manager_->ReadPage(path_map_[column_path], page_id, page->data_);
+  status = disk_manager_->ReadPage(fs, page_id, page->data_);
   return status;
 }
 
@@ -75,45 +73,31 @@ Status BufferPoolManager::UnPinPage(std::filesystem::path column_path,
   for (int i = 0; i < pool_size_; i++) {
     if (OnPage(pages_ + i)) {
       replacer_->UnPin(i);
-      if (replacer_->GetPinCount(i) == 0) {
-        if (Status status = FlushPage(column_path, page_id); !status.ok()) {
-          return status;
-        }
-      }
       break;
     }
   }
   return Status::OK();
 }
 
-Status BufferPoolManager::FlushPage(std::filesystem::path column_path,
-                                    page_id_t page_id) {
-  auto OnPage = [&](Page *page) {
-    return page->GetPath() == column_path && page->GetPageId() == page_id;
-  };
-  for (int i = 0; i < pool_size_; i++) {
-    if (OnPage(pages_ + i)) {
-      auto &page = pages_[i];
-      auto page_lock = page.GetWriteLock();
-      Status status;
-      auto &fs = path_map_[column_path];
-      if (!fs.is_open()) {
-        fs.open(page.GetPath(), std::ios::binary | std::ios::in |
-                                    std::ios::app | std::ios::out);
-      }
-      status = disk_manager_->WritePage(fs, page_id, page.GetData());
-      if (!status.ok()) {
-        return status;
-      }
-      page.is_dirty_ = false;
-    }
+Status BufferPoolManager::FlushPage(frame_id_t frame_id) {
+  auto &page = pages_[frame_id];
+  Status status;
+  auto &fs = path_map_[page.GetPath()];
+  if (!fs.is_open()) {
+    fs.open(page.GetPath(),
+            std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
   }
+  status = disk_manager_->WritePage(fs, page.GetPageId(), page.GetData());
+  if (!status.ok()) {
+    return status;
+  }
+  page.is_dirty_ = false;
   return Status::OK();
 }
 
 Status BufferPoolManager::FlushAllPage() {
   for (int i = 0; i < pool_size_; i++) {
-    std::ignore = FlushPage(pages_[i].GetPath(), pages_[i].GetPageId());
+    std::ignore = FlushPage(i);
   }
   return Status::OK();
 }

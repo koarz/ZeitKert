@@ -102,7 +102,7 @@ Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id,
   fs.seekp(offset);
   fs.write(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
   if (fs.bad()) {
-    return Status::Error(ErrorCode::IOError, "I/O error when reading page");
+    return Status::Error(ErrorCode::IOError, "I/O error when writing page");
   }
   fs.flush();
   return Status::OK();
