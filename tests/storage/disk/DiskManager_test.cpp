@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
+#include <mutex>
 #include <random>
 
 void RandomData(uint8_t *data, size_t size) {
@@ -20,23 +21,33 @@ void RandomData(uint8_t *data, size_t size) {
 }
 
 TEST(DiskManagerTest, ReadWritePageTest) {
-  std::filesystem::path path{"tempfile"};
+  std::filesystem::path path{"temp"};
   std::fstream fs;
   fs.open(path,
           std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
+  fs.close();
+  fs.open(path, std::ios::binary | std::ios::in | std::ios::out);
   DB::DiskManager dm;
-  uint8_t data[DEFAULT_PAGE_SIZE], temp[DEFAULT_PAGE_SIZE];
-  RandomData(data, DEFAULT_PAGE_SIZE);
-  for (int i = 0; i < 64000; i++) {
-    EXPECT_TRUE(dm.WritePage(fs, i, data).ok());
+  std::vector<uint8_t[DEFAULT_PAGE_SIZE]> datas(64), temps(64);
+  for (auto &data : datas) {
+    RandomData(data, DEFAULT_PAGE_SIZE);
   }
-  for (int i = 0; i < 64000; i++) {
-    EXPECT_TRUE(dm.ReadPage(fs, i, temp).ok());
-    for (int i = 0; i < DEFAULT_PAGE_SIZE; i++) {
-      EXPECT_EQ(0, memcmp(data, temp, DEFAULT_PAGE_SIZE));
-    }
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 8; i++) {
+    threads.emplace_back([&, i] {
+      for (int j = 0; j < 8; j++) {
+        EXPECT_TRUE(dm.WritePage(fs, j + 8 * i, datas[j + 8 * i]).ok());
+      }
+      for (int j = 0; j < 8; j++) {
+        EXPECT_TRUE(dm.ReadPage(fs, j + 8 * i, temps[j + 8 * i]).ok());
+        EXPECT_EQ(
+            0, memcmp(datas[j + 8 * i], temps[j + 8 * i], DEFAULT_PAGE_SIZE));
+      }
+    });
   }
-
+  for (auto &t : threads) {
+    t.join();
+  }
   fs.close();
   std::filesystem::remove(path);
 }

@@ -16,6 +16,7 @@ namespace DB {
 class BufferPoolManager {
   std::mutex latch_;
   Page *pages_;
+  std::mutex *page_locks_;
   const size_t pool_size_;
   std::unique_ptr<Replacer> replacer_;
   std::shared_ptr<DiskManager> disk_manager_;

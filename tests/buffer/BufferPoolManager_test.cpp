@@ -30,8 +30,10 @@ TEST(BufferPoolManagerTest, BasicTest) {
     Page *page;
     for (int i = 0; i < 8; i++) {
       EXPECT_TRUE(bpm.FetchPage(col1, i, page).ok());
+      EXPECT_EQ(i, page->GetPageId());
       memcpy(page->GetData(), datas[i], DEFAULT_PAGE_SIZE);
       page->SetDirty(true);
+      EXPECT_EQ(0, memcmp(page->GetData(), datas[i], DEFAULT_PAGE_SIZE));
       EXPECT_TRUE(bpm.UnPinPage(page->GetPath(), page->GetPageId()).ok());
     }
     for (int i = 0; i < 8; i++) {
@@ -44,8 +46,10 @@ TEST(BufferPoolManagerTest, BasicTest) {
     Page *page;
     for (int i = 8; i < 16; i++) {
       EXPECT_TRUE(bpm.FetchPage(col2, i - 8, page).ok());
+      EXPECT_EQ(i - 8, page->GetPageId());
       memcpy(page->GetData(), datas[i], DEFAULT_PAGE_SIZE);
       page->SetDirty(true);
+      EXPECT_EQ(0, memcmp(page->GetData(), datas[i], DEFAULT_PAGE_SIZE));
       EXPECT_TRUE(bpm.UnPinPage(page->GetPath(), page->GetPageId()).ok());
     }
     for (int i = 8; i < 16; i++) {

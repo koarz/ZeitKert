@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
+#include <unordered_map>
 
 namespace DB {
 class QueryContext;
@@ -15,6 +17,7 @@ class QueryContext;
 class DiskManager : public Instance<DiskManager> {
   std::filesystem::path path_;
   std::mutex latch_;
+  std::unordered_map<std::fstream *, std::mutex> latchs_;
 
 public:
   DiskManager() : path_(default_databases_dir) {

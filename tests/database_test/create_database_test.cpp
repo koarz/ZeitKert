@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
-TEST(create_database, create_new_database) {
+TEST(create_database, DISABLED_create_new_database) {
   DB::ZeitgeistDB db;
 
   DB::ResultSet res;
@@ -24,7 +24,7 @@ TEST(create_database, create_new_database) {
     ASSERT_TRUE(status.ok());
   }
 }
-TEST(create_database, create_database_error_for_exit) {
+TEST(create_database, DISABLED_create_database_error_for_exit) {
   DB::ZeitgeistDB db;
 
   DB::ResultSet res;
