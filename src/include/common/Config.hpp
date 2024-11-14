@@ -5,7 +5,9 @@
 #include <mutex>
 #include <shared_mutex>
 
+#ifndef TESTS
 #define USELSMENGINE
+#endif
 
 constexpr auto default_databases_dir = ".ZeitgeistDB";
 
