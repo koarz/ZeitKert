@@ -12,7 +12,6 @@
 #include <unordered_map>
 
 namespace DB {
-class QueryContext;
 
 class DiskManager : public Instance<DiskManager> {
   std::filesystem::path path_;

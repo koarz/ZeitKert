@@ -72,11 +72,11 @@ Status DiskManager::CreateTable(std::filesystem::path table,
     return Status::Error(ErrorCode::CreateError, "The Table Already Exists");
   }
   auto path = table / TableMeta::default_table_meta_name;
-  std::ofstream outFile(path, std::ios::binary);
+  std::ofstream meta_file(path, std::ios::binary);
 
-  outFile.write(table_meta.data(), table_meta.size());
+  meta_file.write(table_meta.data(), table_meta.size());
 
-  outFile.close();
+  meta_file.close();
   return Status::OK();
 }
 

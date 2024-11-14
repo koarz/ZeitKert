@@ -69,7 +69,6 @@ int main(int argc, char *argv[]) {
     const std::chrono::duration<double> diff = end - start;
     std::cout << "\nTime : " << std::fixed << std::setprecision(9) << diff
               << "\n\n";
-    history.emplace(std::move(query));
   }
 
   std::cout << "Bye.\n";

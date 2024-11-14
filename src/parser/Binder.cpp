@@ -25,16 +25,16 @@ Status Binder::Parse(std::string_view query,
   std::string message;
   switch (parser_.tree_->GetNodeType()) {
   case ASTNodeType::CreateQuery:
-    statement = Transform::TransCreateQuery(parser_.tree_, message);
+    statement = Transform::TransCreateQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::UseQuery:
-    statement = Transform::TransUseQuery(parser_.tree_, message);
+    statement = Transform::TransUseQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::ShowQuery:
-    statement = Transform::TransShowQuery(parser_.tree_, message);
+    statement = Transform::TransShowQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::SelectQuery:
-    statement = Transform::TransSelectQuery(parser_.tree_, message);
+    statement = Transform::TransSelectQuery(parser_.tree_, message, context);
     break;
   default: break;
   }

@@ -22,6 +22,8 @@ constexpr page_id_t INVALID_PAGE_ID = -1;
 constexpr uint32_t SSTABLE_SIZE = 0x400000;
 #ifdef USELSMENGINE
 constexpr size_t DEFAULT_PAGE_SIZE = SSTABLE_SIZE;
+constexpr size_t DEFAULT_POOL_SIZE = 16;
 #else
 constexpr size_t DEFAULT_PAGE_SIZE = 4096;
+constexpr size_t DEFAULT_POOL_SIZE = 128;
 #endif

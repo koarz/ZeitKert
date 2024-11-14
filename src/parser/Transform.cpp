@@ -21,6 +21,7 @@
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
+#include "storage/lsmtree/LSMTree.hpp"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
 #include "type/String.hpp"
@@ -31,8 +32,9 @@
 #include <vector>
 
 namespace DB {
-std::shared_ptr<CreateStmt> Transform::TransCreateQuery(ASTPtr node,
-                                                        std::string &message) {
+std::shared_ptr<CreateStmt>
+Transform::TransCreateQuery(ASTPtr node, std::string &message,
+                            std::shared_ptr<QueryContext> context) {
   auto &create_query = dynamic_cast<CreateQuery &>(*node);
   auto name = create_query.GetName();
   auto type = create_query.GetType();
@@ -70,14 +72,19 @@ std::shared_ptr<CreateStmt> Transform::TransCreateQuery(ASTPtr node,
           return nullptr;
         }
       }
-      columns.emplace_back(std::make_shared<ColumnMeta>(col_name, type, 0));
+      columns.emplace_back(std::make_shared<ColumnMeta>(
+          col_name, type, 0,
+          std::make_shared<LSMTree>(context->disk_manager_->GetPath() / name /
+                                        col_name,
+                                    context->buffer_pool_manager_, type)));
     }
   }
   return std::make_shared<CreateStmt>(type, name, columns);
 }
 
-std::shared_ptr<UseStmt> Transform::TransUseQuery(ASTPtr node,
-                                                  std::string &message) {
+std::shared_ptr<UseStmt>
+Transform::TransUseQuery(ASTPtr node, std::string &message,
+                         std::shared_ptr<QueryContext> context) {
   auto &use_query = dynamic_cast<UseQuery &>(*node);
 
   auto name = use_query.GetName();
@@ -85,15 +92,17 @@ std::shared_ptr<UseStmt> Transform::TransUseQuery(ASTPtr node,
   return std::make_shared<UseStmt>(name);
 }
 
-std::shared_ptr<ShowStmt> Transform::TransShowQuery(ASTPtr node,
-                                                    std::string &message) {
+std::shared_ptr<ShowStmt>
+Transform::TransShowQuery(ASTPtr node, std::string &message,
+                          std::shared_ptr<QueryContext> context) {
   auto &show_query = dynamic_cast<ShowQuery &>(*node);
 
   return std::make_shared<ShowStmt>(show_query.GetShowType());
 }
 
-std::shared_ptr<SelectStmt> Transform::TransSelectQuery(ASTPtr node,
-                                                        std::string &message) {
+std::shared_ptr<SelectStmt>
+Transform::TransSelectQuery(ASTPtr node, std::string &message,
+                            std::shared_ptr<QueryContext> context) {
   auto &select_query = dynamic_cast<SelectQuery &>(*node);
 
   auto &node_query = dynamic_cast<ASTToken &>(*select_query.children_[0]);
