@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/util/SliceUtil.hpp"
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -7,12 +8,12 @@
 namespace DB {
 class Slice {
   const char *data_;
-  size_t size_;
+  uint16_t size_;
 
 public:
   Slice() : data_(nullptr), size_(0) {}
 
-  Slice(const char *data, size_t size) : data_(data), size_(size) {}
+  Slice(const char *data, uint16_t size) : data_(data), size_(size) {}
 
   Slice(const std::string &s) : data_(s.data()), size_(s.size()) {}
 
@@ -21,7 +22,11 @@ public:
   Slice(const Slice &) = default;
   Slice &operator=(const Slice &) = default;
 
-  std::string Serilize() const { return std::to_string(size_) + ToString(); }
+  std::string Serilize() const {
+    uint8_t s[sizeof(size_)]{};
+    SliceUtil::EncodeUint16(s, size_);
+    return std::string(reinterpret_cast<char *>(s), sizeof(s)) + ToString();
+  }
 
   size_t Size() const { return size_; }
 
