@@ -11,11 +11,13 @@
 
 namespace DB {
 Database::Database(std::filesystem::path path,
-                   std::shared_ptr<DiskManager> disk_manager)
+                   std::shared_ptr<DiskManager> disk_manager,
+                   std::shared_ptr<BufferPoolManager> buffer_pool_manager)
     : path_(path), disk_manager_(disk_manager) {
   for (const auto &entry : std::filesystem::directory_iterator(path)) {
-    table_metas_.emplace(entry.path().filename(),
-                         std::make_shared<TableMeta>(entry.path()));
+    auto [it, _] = table_metas_.emplace(
+        entry.path().filename(),
+        std::make_shared<TableMeta>(entry.path(), buffer_pool_manager));
   }
 }
 

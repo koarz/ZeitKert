@@ -29,8 +29,9 @@ Status ZeitgeistDB::HandleUseStmt() {
   auto disk_manager = context_->disk_manager_;
   auto status = disk_manager->OpenDatabase(name);
   if (status.ok()) {
-    context_->database_ = std::make_shared<Database>(
-        disk_manager->GetPath() / name, disk_manager);
+    context_->database_ =
+        std::make_shared<Database>(disk_manager->GetPath() / name, disk_manager,
+                                   context_->buffer_pool_manager_);
   }
   return status;
 }

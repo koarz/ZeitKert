@@ -26,7 +26,8 @@ class TableMeta {
 
 public:
   static constexpr std::string default_table_meta_name = "table_meta.json";
-  explicit TableMeta(std::filesystem::path table_path) {
+  explicit TableMeta(std::filesystem::path table_path,
+                     std::shared_ptr<BufferPoolManager> buffer_pool_manager) {
     std::ifstream fs{table_path / default_table_meta_name};
     std::string meta_data((std::istreambuf_iterator<char>(fs)),
                           std::istreambuf_iterator<char>());
@@ -44,15 +45,21 @@ public:
       // auto nullable = column["nullable"].get_bool();
       if (type == "int") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Int>(), page_num));
+            std::string(name), std::make_shared<Int>(), page_num,
+            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
+                                      std::make_shared<Int>())));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "string") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<String>(), page_num));
+            std::string(name), std::make_shared<String>(), page_num,
+            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
+                                      std::make_shared<String>())));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "double") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Double>(), page_num));
+            std::string(name), std::make_shared<Double>(), page_num,
+            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
+                                      std::make_shared<Double>())));
         name_map_column_idx_.emplace(name, idx++);
       }
     }
