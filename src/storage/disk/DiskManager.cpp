@@ -82,6 +82,9 @@ Status DiskManager::CreateTable(std::filesystem::path table,
 
 Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id,
                              uint8_t *data) {
+  latch_.lock();
+  std::unique_lock latch(latchs_[&fs]);
+  latch_.unlock();
   int offset = page_id * DEFAULT_PAGE_SIZE;
   fs.seekp(offset);
   fs.read(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
@@ -98,8 +101,11 @@ Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id,
 
 Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id,
                               uint8_t *data) {
+  latch_.lock();
+  std::unique_lock latch(latchs_[&fs]);
+  latch_.unlock();
   int offset = page_id * DEFAULT_PAGE_SIZE;
-  fs.seekp(offset);
+  fs.seekg(offset);
   fs.write(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
   if (fs.bad()) {
     return Status::Error(ErrorCode::IOError, "I/O error when writing page");

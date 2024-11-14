@@ -12,14 +12,17 @@ class IndexEngine {
 protected:
   KeyComparator comparator_;
   std::filesystem::path column_path_;
+  std::shared_ptr<ValueType> value_type_;
   std::shared_ptr<BufferPoolManager> buffer_pool_manager_;
 
 public:
   IndexEngine(KeyComparator comparator, std::filesystem::path column_path,
-              std::shared_ptr<BufferPoolManager> buffer_pool_manager)
+              std::shared_ptr<BufferPoolManager> buffer_pool_manager,
+              std::shared_ptr<ValueType> value_type)
       : comparator_(std::move(comparator)),
         column_path_(std::move(column_path)),
-        buffer_pool_manager_(std::move(buffer_pool_manager)) {}
+        buffer_pool_manager_(std::move(buffer_pool_manager)),
+        value_type_(value_type) {}
 
   virtual ~IndexEngine() = default;
 
@@ -27,6 +30,6 @@ public:
 
   virtual Status Remove(const Key &key) = 0;
 
-  virtual Status GetValue(const Key &key, ColumnPtr column) = 0;
+  virtual Status GetValue(const Key &key, Value *value) = 0;
 };
 } // namespace DB

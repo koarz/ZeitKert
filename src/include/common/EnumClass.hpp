@@ -15,6 +15,7 @@ enum class ErrorCode {
   IOError,
   BufferPoolError,
   NotFound,
+  DataTooLarge,
 };
 
 enum class StatementType {

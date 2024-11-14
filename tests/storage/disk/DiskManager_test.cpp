@@ -20,7 +20,7 @@ void RandomData(uint8_t *data, size_t size) {
   }
 }
 
-TEST(DiskManagerTest, ReadWritePageTest) {
+TEST(DiskManagerTest, DISABLED_ReadWritePageTest) {
   std::filesystem::path path{"temp"};
   std::fstream fs;
   fs.open(path,

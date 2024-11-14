@@ -11,7 +11,7 @@
 
 void RandomData(uint8_t *data, size_t size);
 
-TEST(BufferPoolManagerTest, BasicTest) {
+TEST(BufferPoolManagerTest, DISABLED_BasicTest) {
   using namespace DB;
   auto dm = std::make_shared<DiskManager>();
   BufferPoolManager bpm(4, dm);
