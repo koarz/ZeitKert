@@ -55,8 +55,6 @@ int main(int argc, char *argv[]) {
 
     linenoiseHistoryAdd(query.c_str());
 
-    std::cout << '\n';
-
     DB::ResultSet res;
     const auto start = std::chrono::steady_clock::now();
     if (DB::Status status = db.ExecuteQuery(query, res); !status.ok()) {
@@ -87,6 +85,9 @@ void CheckerRegister() {
   Checker::RegisterKeyWord("TABLE");
   Checker::RegisterKeyWord("TABLES");
   Checker::RegisterKeyWord("SELECT");
+  Checker::RegisterKeyWord("INSERT");
+  Checker::RegisterKeyWord("INTO");
+  Checker::RegisterKeyWord("VALUES");
 
   Checker::RegisterType("INT");
   // Checker::RegisterType("Varchar");

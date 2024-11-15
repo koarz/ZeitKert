@@ -10,7 +10,7 @@ namespace DB {
 class Binder {
   Parser parser_;
 
-  std::vector<std::shared_ptr<SQLStatement>> statements_;
+  std::shared_ptr<SQLStatement> statement_;
 
 public:
   Binder() = default;
@@ -18,8 +18,6 @@ public:
   Status Parse(std::string_view query, std::shared_ptr<QueryContext> context,
                ResultSet &result_set);
 
-  std::vector<std::shared_ptr<SQLStatement>> &GetStatements() {
-    return statements_;
-  }
+  std::shared_ptr<SQLStatement> &GetStatement() { return statement_; }
 };
 } // namespace DB

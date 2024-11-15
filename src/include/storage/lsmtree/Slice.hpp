@@ -1,41 +1,83 @@
 #pragma once
 
+#include "common/Config.hpp"
 #include "common/util/SliceUtil.hpp"
+
 #include <cstddef>
 #include <cstring>
 #include <string>
 
 namespace DB {
 class Slice {
-  const char *data_;
+  Byte *data_;
   uint16_t size_;
 
 public:
   Slice() : data_(nullptr), size_(0) {}
 
-  Slice(const char *data, uint16_t size) : data_(data), size_(size) {}
+  Slice(const char *s) : data_(nullptr), size_(strlen(s)) {
+    data_ = new Byte[size_];
+    memcpy(data_, s, size_);
+  }
 
-  Slice(const std::string &s) : data_(s.data()), size_(s.size()) {}
+  Slice(void *data, uint16_t size) : data_(new Byte[size]()), size_(size) {
+    memcpy(data_, data, size_);
+  }
 
-  Slice(const char *s) : data_(s), size_(strlen(s)) {}
+  Slice(std::string str) : data_(new Byte[str.size()]), size_(str.size()) {
+    memcpy(data_, str.data(), size_);
+  }
 
-  Slice(const Slice &) = default;
-  Slice &operator=(const Slice &) = default;
+  Slice(const Slice &other) {
+    data_ = new Byte[other.size_];
+    size_ = other.size_;
+    memcpy(data_, other.data_, size_);
+  }
+
+  Slice &operator=(const Slice &other) {
+    if (data_)
+      delete[] data_;
+    data_ = new Byte[other.size_];
+    size_ = other.size_;
+    memcpy(data_, other.data_, size_);
+    return *this;
+  }
+
+  Slice(Slice &&other) {
+    if (data_)
+      delete[] data_;
+    data_ = other.data_;
+    size_ = other.size_;
+    other.data_ = nullptr;
+    other.size_ = 0;
+  }
+
+  Slice &operator=(Slice &&other) {
+    if (data_)
+      delete[] data_;
+    data_ = other.data_;
+    size_ = other.size_;
+    other.data_ = nullptr;
+    other.size_ = 0;
+    return *this;
+  }
+
+  ~Slice() { delete[] data_; }
 
   std::string Serilize() const {
-    uint8_t s[sizeof(size_)]{};
+    Byte s[sizeof(size_)]{};
     SliceUtil::EncodeUint16(s, size_);
     return std::string(reinterpret_cast<char *>(s), sizeof(s)) + ToString();
   }
 
   size_t Size() const { return size_; }
 
-  const char *GetData() const { return data_; }
+  std::byte *GetData() const { return data_; }
 
   bool IsEmpty() const { return size_ == 0; }
 
   std::string ToString() const {
-    return std::string(reinterpret_cast<const char *>(data_), size_);
+    return std::string(reinterpret_cast<char *>(data_), size_);
   }
 };
 

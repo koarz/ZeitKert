@@ -2,11 +2,15 @@
 
 #include "execution/AbstractExecutor.hpp"
 #include "execution/FunctionExecutor.hpp"
+#include "execution/InsertExecutor.hpp"
 #include "execution/ProjectionExecutor.hpp"
+#include "execution/TupleExecutor.hpp"
 #include "execution/ValuesExecutor.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
+#include "planner/InsertPlanNode.hpp"
 #include "planner/ProjectionPlanNode.hpp"
+#include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
 #include <memory>
 #include <vector>
@@ -21,7 +25,7 @@ struct ExecutorFactory {
           plan->GetSchemaRef(), std::dynamic_pointer_cast<ValuePlanNode>(plan));
     }
     case PlanType::Function: {
-      auto &p = dynamic_cast<FunctionPlanNode &>(*plan);
+      auto &p = static_cast<FunctionPlanNode &>(*plan);
       std::vector<AbstractExecutorRef> children;
       for (auto child : p.GetChildren()) {
         children.push_back(CreateExecutor(child));
@@ -30,7 +34,7 @@ struct ExecutorFactory {
                                                 std::move(children));
     }
     case PlanType::Projection: {
-      auto &p = dynamic_cast<ProjectionPlanNode &>(*plan);
+      auto &p = static_cast<ProjectionPlanNode &>(*plan);
       std::vector<AbstractExecutorRef> children;
       for (auto child : p.GetChildren()) {
         children.push_back(CreateExecutor(child));
@@ -38,9 +42,26 @@ struct ExecutorFactory {
       return std::make_unique<ProjectionExecutor>(p.GetSchemaRef(),
                                                   std::move(children));
     }
+    case PlanType::Insert: {
+      auto &p = static_cast<InsertPlanNode &>(*plan);
+      std::vector<AbstractExecutorRef> children;
+      for (auto child : p.GetChildren()) {
+        children.push_back(CreateExecutor(child));
+      }
+      return std::make_unique<InsertExecutor>(
+          p.GetSchemaRef(), std::move(children), p.GetTableMeta());
+    }
+    case PlanType::Tuple: {
+      auto &p = static_cast<TuplePlanNode &>(*plan);
+      std::vector<AbstractExecutorRef> children;
+      for (auto child : p.GetChildren()) {
+        children.push_back(CreateExecutor(child));
+      }
+      return std::make_unique<TupleExecutor>(p.GetSchemaRef(),
+                                             std::move(children));
+    }
     case PlanType::SeqScan:
     case PlanType::IndexScan:
-    case PlanType::Insert:
     case PlanType::Update:
     case PlanType::Delete:
     case PlanType::Aggregation:

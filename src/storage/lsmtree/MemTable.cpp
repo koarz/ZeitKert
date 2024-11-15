@@ -20,7 +20,7 @@ Status MemTable::Get(Slice key, Slice *value) {
 void MemTable::RecoverFromWal() {
   Slice key, value;
   while (wal_.ReadFromLogFile(&key, &value)) {
-    std::ignore = Put(key, value);
+    std::ignore = Put(std::move(key), std::move(value));
   }
 }
 

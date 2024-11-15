@@ -1,7 +1,6 @@
 #pragma once
 
 #include "catalog/Schema.hpp"
-#include "execution/AbstractExecutor.hpp"
 #include "function/Function.hpp"
 #include "planner/AbstractPlanNode.hpp"
 

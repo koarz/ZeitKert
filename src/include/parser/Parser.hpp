@@ -33,6 +33,8 @@ public:
 
   Status ParseSelect(TokenIterator &iterator);
 
+  Status ParseInsert(TokenIterator &iterator);
+
   ASTPtr tree_{nullptr};
 };
 } // namespace DB

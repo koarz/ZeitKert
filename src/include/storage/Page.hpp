@@ -11,14 +11,14 @@ namespace DB {
 class Page {
   friend class BufferPoolManager;
 
-  uint8_t *const data_;
+  Byte *const data_;
   bool is_dirty_ = false;
   std::shared_mutex rw_lock_;
   std::filesystem::path path_;
   page_id_t page_id_ = INVALID_PAGE_ID;
 
 public:
-  Page() : data_(new uint8_t[DEFAULT_PAGE_SIZE]) {
+  Page() : data_(new Byte[DEFAULT_PAGE_SIZE]) {
     memset(data_, 0, DEFAULT_PAGE_SIZE);
   }
 
@@ -32,7 +32,7 @@ public:
 
   WriteLock GetWriteLock() { return WriteLock{rw_lock_}; }
 
-  uint8_t *GetData() { return data_; }
+  Byte *GetData() { return data_; }
 
   page_id_t GetPageId() { return page_id_; }
 

@@ -5,10 +5,10 @@
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
 #include "parser/statement/UseStatement.hpp"
-#include "storage/column/Column.hpp"
 
 #include <memory>
 namespace DB {
@@ -29,11 +29,14 @@ struct Transform {
   TransSelectQuery(ASTPtr node, std::string &message,
                    std::shared_ptr<QueryContext> context);
 
-  static std::shared_ptr<ShowStatement>
+  static std::shared_ptr<InsertStatement>
   TransInsertQuery(ASTPtr node, std::string &message,
                    std::shared_ptr<QueryContext> context);
 
 private:
+  static BoundExpressRef GetTupleExpress(TokenIterator begin, TokenIterator end,
+                                         std::string &message);
+
   static BoundExpressRef GetColumnExpress(TokenIterator &it, TokenIterator end,
                                           std::string &message);
 };

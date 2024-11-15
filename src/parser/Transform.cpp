@@ -6,6 +6,7 @@
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/binder/BoundFunction.hpp"
+#include "parser/binder/BoundTuple.hpp"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
 #include "type/String.hpp"
@@ -15,6 +16,20 @@
 #include <vector>
 
 namespace DB {
+BoundExpressRef Transform::GetTupleExpress(TokenIterator begin,
+                                           TokenIterator end,
+                                           std::string &message) {
+  if (begin->type != TokenType::OpeningRoundBracket ||
+      end->type != TokenType::ClosingRoundBracket) {
+    return nullptr;
+  }
+  auto tuple = std::make_shared<BoundTuple>();
+  while (++begin != end) {
+    tuple->elements_.emplace_back(GetColumnExpress(begin, end, message));
+  }
+  return tuple;
+}
+
 BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
                                             TokenIterator end,
                                             std::string &message) {

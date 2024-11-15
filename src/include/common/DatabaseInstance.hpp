@@ -16,9 +16,10 @@
 namespace DB {
 class Database : public Instance<Database> {
   std::filesystem::path path_;
+  // disk manager and buffer pool just for create table meta
   std::shared_ptr<DiskManager> disk_manager_;
   std::shared_ptr<BufferPoolManager> buffer_pool_manager_;
-  std::map<std::string, std::shared_ptr<TableMeta>> table_metas_;
+  std::map<std::string, TableMetaRef> table_metas_;
 
 public:
   explicit Database(std::filesystem::path path,
@@ -29,6 +30,8 @@ public:
                      std::vector<std::shared_ptr<ColumnMeta>> &columns);
 
   Status ShowTables(ResultSet &result_set);
+
+  TableMetaRef GetTableMeta(std::string &table_name);
 };
 
 } // namespace DB

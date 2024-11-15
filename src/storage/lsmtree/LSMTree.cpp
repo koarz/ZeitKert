@@ -20,7 +20,7 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
 }
 
 Status LSMTree::Remove(const Slice &key) {
-  return Insert(key, "");
+  return Insert(key, Slice{});
 }
 
 Status LSMTree::GetValue(const Slice &key, Slice *value) {

@@ -13,36 +13,39 @@ namespace DB {
 Status Binder::Parse(std::string_view query,
                      std::shared_ptr<QueryContext> context,
                      ResultSet &result_set) {
-
-  Tokens tokens(query.begin(), query.end(), 1000);
+  if (query.size() > 64 * 1024 * 1024) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "The query sql size tool big(greater than 64MB)");
+  }
+  Tokens tokens(query.begin(), query.end(), 64 * 1024 * 1024);
   TokenIterator iterator(tokens);
 
   auto status = parser_.Parse(iterator);
   if (!status.ok()) {
     return status;
   }
-  std::shared_ptr<SQLStatement> statement;
   std::string message;
   switch (parser_.tree_->GetNodeType()) {
   case ASTNodeType::CreateQuery:
-    statement = Transform::TransCreateQuery(parser_.tree_, message, context);
+    statement_ = Transform::TransCreateQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::UseQuery:
-    statement = Transform::TransUseQuery(parser_.tree_, message, context);
+    statement_ = Transform::TransUseQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::ShowQuery:
-    statement = Transform::TransShowQuery(parser_.tree_, message, context);
+    statement_ = Transform::TransShowQuery(parser_.tree_, message, context);
     break;
   case ASTNodeType::SelectQuery:
-    statement = Transform::TransSelectQuery(parser_.tree_, message, context);
+    statement_ = Transform::TransSelectQuery(parser_.tree_, message, context);
     break;
+  case ASTNodeType::InsertQuery:
+    statement_ = Transform::TransInsertQuery(parser_.tree_, message, context);
   default: break;
   }
-  if (statement == nullptr) {
+  if (statement_ == nullptr) {
     return Status::Error(ErrorCode::BindError,
                          "Binder suffer error: " + message);
   }
-  statements_.push_back(statement);
   return Status::OK();
 }
 } // namespace DB

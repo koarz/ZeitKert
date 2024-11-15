@@ -16,11 +16,11 @@ namespace DB {
 class ZeitgeistDB {
   std::shared_ptr<QueryContext> context_;
 
-  Status HandleCreateStmt();
+  Status HandleCreateStatement();
 
-  Status HandleUseStmt();
+  Status HandleUseStatement();
 
-  Status HandleShowStmt(ResultSet &result_set);
+  Status HandleShowStatement(ResultSet &result_set);
 
 public:
   ZeitgeistDB() : context_(std::make_shared<QueryContext>()) {}
@@ -36,21 +36,22 @@ public:
     if (!status.ok()) {
       return status;
     }
-    for (auto &stmt : binder.GetStatements()) {
-      context_->sql_statement_ = stmt;
-      switch (stmt->type) {
-      case StatementType::CREATE_STATEMENT:
-        status = HandleCreateStmt();
-        goto ExecuteEnd;
-      case StatementType::USE_STATEMENT:
-        status = HandleUseStmt();
-        goto ExecuteEnd;
-      case StatementType::SHOW_STATEMENT:
-        status = HandleShowStmt(result_set);
-        goto ExecuteEnd;
-      case StatementType::INVALID_STATEMENT:
-      case StatementType::SELECT_STATEMENT: break;
-      }
+
+    auto stmt = binder.GetStatement();
+    context_->sql_statement_ = stmt;
+    switch (stmt->type) {
+    case StatementType::CREATE_STATEMENT:
+      status = HandleCreateStatement();
+      goto ExecuteEnd;
+    case StatementType::USE_STATEMENT:
+      status = HandleUseStatement();
+      goto ExecuteEnd;
+    case StatementType::SHOW_STATEMENT:
+      status = HandleShowStatement(result_set);
+      goto ExecuteEnd;
+    case StatementType::INVALID_STATEMENT:
+    case StatementType::SELECT_STATEMENT:
+    case StatementType::INSERT_STATEMENT: break;
     }
 
     status = planner.QueryPlan();

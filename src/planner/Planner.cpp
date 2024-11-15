@@ -2,11 +2,13 @@
 #include "catalog/Schema.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
-#include "parser/SQLStatement.hpp"
 #include "parser/binder/BoundFunction.hpp"
-#include "parser/statement/SelectStmt.hpp"
+#include "parser/binder/BoundTuple.hpp"
+#include "parser/statement/InsertStatement.hpp"
+#include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
+#include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
 #include <memory>
 #include <vector>
@@ -17,7 +19,9 @@ Planner::Planner(std::shared_ptr<QueryContext> context) : context_(context) {}
 Status Planner::QueryPlan() {
   auto statement = context_->sql_statement_;
   if (statement->type == StatementType::SELECT_STATEMENT) {
-    return PlanSelect(dynamic_cast<SelectStmt &>(*statement));
+    return PlanSelect(static_cast<SelectStatement &>(*statement));
+  } else if (statement->type == StatementType::INSERT_STATEMENT) {
+    return PlanInsert(static_cast<InsertStatement &>(*statement));
   }
   return Status::OK();
 }
@@ -32,12 +36,20 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
                                            std::move(expr_column));
   }
   case BoundExpressType::BoundFunction: {
-    auto &exp = dynamic_cast<BoundFunction &>(*expr);
+    auto &exp = static_cast<BoundFunction &>(*expr);
     for (auto col : exp.GetArguments()) {
       abst_column.push_back(GetPlanNode(col));
     }
     return std::make_shared<FunctionPlanNode>(
         std::make_shared<Schema>(), std::move(abst_column), exp.GetFunction());
+  }
+  case BoundExpressType::BoundTuple: {
+    auto &exp = static_cast<BoundTuple &>(*expr);
+    for (auto col : exp.elements_) {
+      abst_column.push_back(GetPlanNode(col));
+    }
+    return std::make_shared<TuplePlanNode>(std::make_shared<Schema>(),
+                                           std::move(abst_column));
   }
   }
   return nullptr;

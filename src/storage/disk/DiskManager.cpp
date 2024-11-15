@@ -59,7 +59,7 @@ Status DiskManager::ShowDatabase(ResultSet &result_set) {
 
 Status DiskManager::OpenDatabase(std::string name) {
   auto path = path_ / name;
-  if (!path.has_filename()) {
+  if (!std::filesystem::is_directory(path)) {
     return Status::Error(ErrorCode::DatabaseNotExists,
                          "The database not exists");
   }
@@ -80,8 +80,7 @@ Status DiskManager::CreateTable(std::filesystem::path table,
   return Status::OK();
 }
 
-Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id,
-                             uint8_t *data) {
+Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id, Byte *data) {
   latch_.lock();
   std::unique_lock latch(latchs_[&fs]);
   latch_.unlock();
@@ -99,8 +98,7 @@ Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id,
   return Status::OK();
 }
 
-Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id,
-                              uint8_t *data) {
+Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id, Byte *data) {
   latch_.lock();
   std::unique_lock latch(latchs_[&fs]);
   latch_.unlock();

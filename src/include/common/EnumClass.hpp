@@ -16,6 +16,7 @@ enum class ErrorCode {
   BufferPoolError,
   NotFound,
   DataTooLarge,
+  InsertError,
 };
 
 enum class StatementType {
@@ -24,6 +25,7 @@ enum class StatementType {
   USE_STATEMENT,
   SHOW_STATEMENT,
   SELECT_STATEMENT,
+  INSERT_STATEMENT,
 };
 
 enum class ASTNodeType {
@@ -36,6 +38,7 @@ enum class ASTNodeType {
   ColumnRef,
   TableRef,
   Function,
+  InsertQuery,
   Token,
 };
 
@@ -47,6 +50,7 @@ enum class ShowType {
 enum class BoundExpressType {
   BoundConstant,
   BoundFunction,
+  BoundTuple,
 };
 
 enum class PlanType {
@@ -63,6 +67,7 @@ enum class PlanType {
   Filter,
   Values,
   Function,
+  Tuple,
   Projection,
   Sort,
   TopN,

@@ -16,6 +16,7 @@ using timestamp_t = uint64_t;
 using page_id_t = int32_t;
 using ReadLock = std::shared_lock<std::shared_mutex>;
 using WriteLock = std::unique_lock<std::shared_mutex>;
+using Byte = std::byte;
 
 constexpr page_id_t INVALID_PAGE_ID = -1;
 // per sstable size is 4MB

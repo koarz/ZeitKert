@@ -9,7 +9,7 @@
 #include <memory>
 #include <thread>
 
-void RandomData(uint8_t *data, size_t size);
+void RandomData(Byte *data, size_t size);
 
 TEST(BufferPoolManagerTest, BasicTest) {
   using namespace DB;
@@ -21,7 +21,7 @@ TEST(BufferPoolManagerTest, BasicTest) {
     std::filesystem::remove(col2);
     delete ptr;
   });
-  std::vector<uint8_t[DEFAULT_PAGE_SIZE]> datas(16);
+  std::vector<Byte[DEFAULT_PAGE_SIZE]> datas(16);
   for (auto &data : datas) {
     RandomData(data, DEFAULT_PAGE_SIZE);
   }

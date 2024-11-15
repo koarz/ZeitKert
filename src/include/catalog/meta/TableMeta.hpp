@@ -100,6 +100,8 @@ public:
     return buffer.GetString();
   }
 
+  std::vector<ColumnMetaRef> &GetColumns() { return columns_; }
+
   ColumnMetaRef GetColumn(std::string &col_name) {
     return columns_[name_map_column_idx_[col_name]];
   }

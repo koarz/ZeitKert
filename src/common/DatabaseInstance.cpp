@@ -41,4 +41,12 @@ Status Database::ShowTables(ResultSet &result_set) {
                                            std::make_shared<String>()));
   return Status::OK();
 }
+
+TableMetaRef Database::GetTableMeta(std::string &table_name) {
+  auto it = table_metas_.find(table_name);
+  if (it == table_metas_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
 } // namespace DB

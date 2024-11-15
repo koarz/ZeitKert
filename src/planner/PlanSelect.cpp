@@ -2,7 +2,7 @@
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
 #include "parser/binder/BoundExpress.hpp"
-#include "parser/statement/SelectStmt.hpp"
+#include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/Planner.hpp"
 #include "planner/ProjectionPlanNode.hpp"
@@ -11,8 +11,7 @@
 #include <memory>
 
 namespace DB {
-Status Planner::PlanSelect(SelectStmt &satement) {
-
+Status Planner::PlanSelect(SelectStatement &satement) {
   std::vector<AbstractPlanNodeRef> columns;
   std::vector<BoundExpressRef> temp_columns;
   for (auto &column : satement.columns_) {

@@ -2,6 +2,7 @@
 
 #include "common/Context.hpp"
 #include "common/Status.hpp"
+#include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 
@@ -18,6 +19,8 @@ public:
   Status QueryPlan();
 
   Status PlanSelect(SelectStatement &statement);
+
+  Status PlanInsert(InsertStatement &statement);
 
   AbstractPlanNodeRef GetPlanNode(BoundExpressRef plan);
 };

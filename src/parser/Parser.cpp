@@ -3,6 +3,7 @@
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
+#include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
 #include "parser/ASTToken.hpp"
@@ -36,6 +37,8 @@ Status Parser::Parse(TokenIterator &iterator) {
     } else if (str == "DROP") {
     } else if (str == "SELECT") {
       status = ParseSelect(iterator);
+    } else if (str == "INSERT") {
+      status = ParseInsert(iterator);
     }
   } else {
     status = Status::Error(
@@ -144,6 +147,35 @@ Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
     }
   }
   return status;
+}
+
+Status Parser::ParseInsert(TokenIterator &iterator) {
+  ++iterator;
+  std::string s{iterator->begin, iterator->end};
+  ++iterator;
+
+  if (Checker::IsKeyWord(s)) {
+    if (s == "INTO") {
+      s = std::string{iterator->begin, iterator->end};
+      tree_ = std::make_shared<InsertQuery>(std::move(s));
+      ++iterator;
+      s = std::string{iterator->begin, iterator->end};
+      if (Checker::IsKeyWord(s)) {
+        if (s == "VALUES") {
+          std::optional<TokenIterator> begin{++iterator};
+          while (!(++iterator)->isEnd())
+            ;
+          std::optional<TokenIterator> end{iterator};
+          // values tuple
+          tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
+        }
+      }
+      return Status::OK();
+    }
+  }
+
+  return Status::Error(ErrorCode::SyntaxError,
+                       "INSERT back should INTO keyword");
 }
 
 } // namespace DB

@@ -11,12 +11,12 @@
 #include <mutex>
 #include <random>
 
-void RandomData(uint8_t *data, size_t size) {
+void RandomData(Byte *data, size_t size) {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<> distrib(0, 0xff);
   for (int i = 0; i < size; i++) {
-    data[i] = distrib(gen);
+    data[i] = static_cast<Byte>(distrib(gen));
   }
 }
 
@@ -28,7 +28,7 @@ TEST(DiskManagerTest, ReadWritePageTest) {
   fs.close();
   fs.open(path, std::ios::binary | std::ios::in | std::ios::out);
   DB::DiskManager dm;
-  std::vector<uint8_t[DEFAULT_PAGE_SIZE]> datas(64), temps(64);
+  std::vector<Byte[DEFAULT_PAGE_SIZE]> datas(64), temps(64);
   for (auto &data : datas) {
     RandomData(data, DEFAULT_PAGE_SIZE);
   }
