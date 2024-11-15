@@ -1,130 +1,20 @@
 #include "parser/Transform.hpp"
-#include "catalog/meta/ColumnMeta.hpp"
-#include "common/EnumClass.hpp"
 #include "common/util/StringUtil.hpp"
-#include "parser/ASTCreateQuery.hpp"
-#include "parser/ASTSelectQuery.hpp"
-#include "parser/ASTShowQuery.hpp"
-#include "parser/ASTToken.hpp"
-#include "parser/ASTUseQuery.hpp"
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/binder/BoundFunction.hpp"
-#include "parser/statement/CreateStatement.hpp"
-#include "parser/statement/SelectStatement.hpp"
-#include "parser/statement/ShowStatement.hpp"
-#include "parser/statement/UseStatement.hpp"
-#include "storage/column/Column.hpp"
-#include "storage/column/ColumnString.hpp"
-#include "storage/column/ColumnVector.hpp"
-#include "storage/column/ColumnWithNameType.hpp"
-#include "storage/lsmtree/LSMTree.hpp"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
 #include "type/String.hpp"
 
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace DB {
-std::shared_ptr<CreateStatement>
-Transform::TransCreateQuery(ASTPtr node, std::string &message,
-                            std::shared_ptr<QueryContext> context) {
-  auto &create_query = dynamic_cast<CreateQuery &>(*node);
-  auto name = create_query.GetName();
-  auto type = create_query.GetType();
-  std::vector<ColumnMetaRef> columns;
-  if (type == CreateType::TABLE) {
-    auto &node_query = dynamic_cast<ASTToken &>(*create_query.children_[0]);
-    auto it = node_query.Begin();
-    while (it->type != TokenType::ClosingRoundBracket) {
-      if (it->type == TokenType::Comma) {
-        ++it;
-      }
-      std::vector<Token> tokens;
-      // token is ',' or ')'
-      while (it->type != TokenType::Comma &&
-             it->type != TokenType::ClosingRoundBracket) {
-        if (it->type == TokenType::BareWord) {
-          tokens.push_back(*it);
-        }
-        ++it;
-      }
-      // we will get all messages of one column
-      // tokens[0] is col_name tokens[1] is val type
-      // current version not upport others
-      std::shared_ptr<ValueType> type;
-      auto col_name = std::string{tokens[0].begin, tokens[0].end};
-      auto var_type = std::string{tokens[1].begin, tokens[1].end};
-      if (Checker::IsType(var_type)) {
-        if (var_type == "INT") {
-          type = std::make_shared<Int>();
-        } else if (var_type == "STRING") {
-          type = std::make_shared<String>();
-        } else if (var_type == "DOUBLE") {
-          type = std::make_shared<Double>();
-        } else {
-          return nullptr;
-        }
-      }
-      columns.emplace_back(std::make_shared<ColumnMeta>(
-          col_name, type, 0,
-          std::make_shared<LSMTree>(context->disk_manager_->GetPath() / name /
-                                        col_name,
-                                    context->buffer_pool_manager_, type)));
-    }
-  }
-  return std::make_shared<CreateStatement>(type, name, columns);
-}
-
-std::shared_ptr<UseStatement>
-Transform::TransUseQuery(ASTPtr node, std::string &message,
-                         std::shared_ptr<QueryContext> context) {
-  auto &use_query = dynamic_cast<UseQuery &>(*node);
-
-  auto name = use_query.GetName();
-
-  return std::make_shared<UseStatement>(name);
-}
-
-std::shared_ptr<ShowStatement>
-Transform::TransShowQuery(ASTPtr node, std::string &message,
-                          std::shared_ptr<QueryContext> context) {
-  auto &show_query = dynamic_cast<ShowQuery &>(*node);
-
-  return std::make_shared<ShowStatement>(show_query.GetShowType());
-}
-
-std::shared_ptr<SelectStatement>
-Transform::TransSelectQuery(ASTPtr node, std::string &message,
-                            std::shared_ptr<QueryContext> context) {
-  auto &select_query = dynamic_cast<SelectQuery &>(*node);
-
-  auto &node_query = dynamic_cast<ASTToken &>(*select_query.children_[0]);
-  std::vector<BoundExpressRef> columns;
-  auto it = node_query.Begin();
-  auto res = std::make_shared<SelectStatement>();
-
-  // that's one query output column end of 'FROM'
-  // we need parse constant or function or colname or table.col
-  while (it != node_query.End()) {
-    auto col = GetColumnExpress(it, node_query.End(), message);
-    if (!message.empty()) {
-      return nullptr;
-    }
-    columns.push_back(col);
-    ++it;
-  }
-
-  res->columns_ = std::move(columns);
-  return res;
-}
-
 BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
                                             TokenIterator end,
                                             std::string &message) {
