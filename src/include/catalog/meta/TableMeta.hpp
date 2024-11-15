@@ -1,18 +1,19 @@
 #pragma once
 
 #include "catalog/meta/ColumnMeta.hpp"
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 #include "simdjson.h"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
 #include "type/String.hpp"
-#include <rapidjson/document.h>
-#include <rapidjson/stringbuffer.h>
-#include <rapidjson/writer.h>
 
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <memory>
+#include <stdatomic.h>
 #include <string>
 #include <sys/types.h>
 #include <vector>
@@ -20,6 +21,7 @@
 namespace DB {
 class TableMeta {
   std::string table_name_;
+  atomic_uint32_t row_number_;
   std::vector<ColumnMetaRef> columns_;
   // primary_key
   std::map<std::string, uint> name_map_column_idx_;
@@ -35,7 +37,7 @@ public:
     simdjson::dom::parser parser;
     auto json = parser.parse(meta_data);
     table_name_ = json["table_name"];
-
+    row_number_ = std::stoul(std::string(json["row_number"]));
     uint idx{};
     for (const auto &column : json["columns"]) {
       auto name = column["name"].get_string().value();
@@ -75,6 +77,8 @@ public:
     writer.StartObject();
     writer.Key("table_name");
     writer.String(table_name_.c_str());
+    writer.Key("row_number");
+    writer.String(std::to_string(row_number_).c_str());
 
     writer.Key("columns");
     writer.StartArray();
@@ -101,5 +105,9 @@ public:
   }
 
   std::string GetTableName() { return table_name_; }
+
+  atomic_uint32_t &GetRowNumber() { return row_number_; }
 };
+
+using TableMetaRef = std::shared_ptr<TableMeta>;
 } // namespace DB
