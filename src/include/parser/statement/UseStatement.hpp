@@ -5,14 +5,14 @@
 #include <string>
 
 namespace DB {
-class UseStmt : public SQLStatement {
+class UseStatement : public SQLStatement {
   std::string name_;
 
 public:
-  explicit UseStmt(std::string name)
+  explicit UseStatement(std::string name)
       : SQLStatement(StatementType::USE_STATEMENT), name_(std::move(name)) {}
 
-  ~UseStmt() override = default;
+  ~UseStatement() override = default;
 
   std::string GetName() { return name_; }
 };

@@ -4,17 +4,17 @@
 #include "parser/SQLStatement.hpp"
 
 namespace DB {
-class CreateStmt : public SQLStatement {
+class CreateStatement : public SQLStatement {
 
 public:
   static constexpr const StatementType TYPE = StatementType::CREATE_STATEMENT;
 
-  explicit CreateStmt(CreateType &type, std::string &name,
-                      std::vector<std::shared_ptr<ColumnMeta>> &columns)
+  explicit CreateStatement(CreateType &type, std::string &name,
+                           std::vector<std::shared_ptr<ColumnMeta>> &columns)
       : SQLStatement(StatementType::CREATE_STATEMENT), type_(type),
         name_(std::move(name)), columns_(std::move(columns)) {}
 
-  ~CreateStmt() override = default;
+  ~CreateStatement() override = default;
 
   CreateType GetCreateType() { return type_; }
 

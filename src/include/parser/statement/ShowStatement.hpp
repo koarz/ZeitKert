@@ -4,14 +4,14 @@
 #include "parser/SQLStatement.hpp"
 
 namespace DB {
-class ShowStmt : public SQLStatement {
+class ShowStatement : public SQLStatement {
   ShowType show_type_;
 
 public:
-  explicit ShowStmt(ShowType show_type)
+  explicit ShowStatement(ShowType show_type)
       : SQLStatement(StatementType::SHOW_STATEMENT), show_type_(show_type) {}
 
-  ~ShowStmt() override = default;
+  ~ShowStatement() override = default;
 
   ShowType GetShowType() { return show_type_; }
 };

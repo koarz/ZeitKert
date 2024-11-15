@@ -4,29 +4,33 @@
 #include "parser/AST.hpp"
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundExpress.hpp"
-#include "parser/statement/CreateStmt.hpp"
-#include "parser/statement/SelectStmt.hpp"
-#include "parser/statement/ShowStmt.hpp"
-#include "parser/statement/UseStmt.hpp"
+#include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/SelectStatement.hpp"
+#include "parser/statement/ShowStatement.hpp"
+#include "parser/statement/UseStatement.hpp"
 #include "storage/column/Column.hpp"
 
 #include <memory>
 namespace DB {
 struct Transform {
-  static std::shared_ptr<CreateStmt>
+  static std::shared_ptr<CreateStatement>
   TransCreateQuery(ASTPtr node, std::string &message,
                    std::shared_ptr<QueryContext> context);
 
-  static std::shared_ptr<UseStmt>
+  static std::shared_ptr<UseStatement>
   TransUseQuery(ASTPtr node, std::string &message,
                 std::shared_ptr<QueryContext> context);
 
-  static std::shared_ptr<ShowStmt>
+  static std::shared_ptr<ShowStatement>
   TransShowQuery(ASTPtr node, std::string &message,
                  std::shared_ptr<QueryContext> context);
 
-  static std::shared_ptr<SelectStmt>
+  static std::shared_ptr<SelectStatement>
   TransSelectQuery(ASTPtr node, std::string &message,
+                   std::shared_ptr<QueryContext> context);
+
+  static std::shared_ptr<ShowStatement>
+  TransInsertQuery(ASTPtr node, std::string &message,
                    std::shared_ptr<QueryContext> context);
 
 private:

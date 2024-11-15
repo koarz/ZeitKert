@@ -13,10 +13,10 @@
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/binder/BoundFunction.hpp"
-#include "parser/statement/CreateStmt.hpp"
-#include "parser/statement/SelectStmt.hpp"
-#include "parser/statement/ShowStmt.hpp"
-#include "parser/statement/UseStmt.hpp"
+#include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/SelectStatement.hpp"
+#include "parser/statement/ShowStatement.hpp"
+#include "parser/statement/UseStatement.hpp"
 #include "storage/column/Column.hpp"
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
@@ -32,7 +32,7 @@
 #include <vector>
 
 namespace DB {
-std::shared_ptr<CreateStmt>
+std::shared_ptr<CreateStatement>
 Transform::TransCreateQuery(ASTPtr node, std::string &message,
                             std::shared_ptr<QueryContext> context) {
   auto &create_query = dynamic_cast<CreateQuery &>(*node);
@@ -79,28 +79,28 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
                                     context->buffer_pool_manager_, type)));
     }
   }
-  return std::make_shared<CreateStmt>(type, name, columns);
+  return std::make_shared<CreateStatement>(type, name, columns);
 }
 
-std::shared_ptr<UseStmt>
+std::shared_ptr<UseStatement>
 Transform::TransUseQuery(ASTPtr node, std::string &message,
                          std::shared_ptr<QueryContext> context) {
   auto &use_query = dynamic_cast<UseQuery &>(*node);
 
   auto name = use_query.GetName();
 
-  return std::make_shared<UseStmt>(name);
+  return std::make_shared<UseStatement>(name);
 }
 
-std::shared_ptr<ShowStmt>
+std::shared_ptr<ShowStatement>
 Transform::TransShowQuery(ASTPtr node, std::string &message,
                           std::shared_ptr<QueryContext> context) {
   auto &show_query = dynamic_cast<ShowQuery &>(*node);
 
-  return std::make_shared<ShowStmt>(show_query.GetShowType());
+  return std::make_shared<ShowStatement>(show_query.GetShowType());
 }
 
-std::shared_ptr<SelectStmt>
+std::shared_ptr<SelectStatement>
 Transform::TransSelectQuery(ASTPtr node, std::string &message,
                             std::shared_ptr<QueryContext> context) {
   auto &select_query = dynamic_cast<SelectQuery &>(*node);
@@ -108,7 +108,7 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
   auto &node_query = dynamic_cast<ASTToken &>(*select_query.children_[0]);
   std::vector<BoundExpressRef> columns;
   auto it = node_query.Begin();
-  auto res = std::make_shared<SelectStmt>();
+  auto res = std::make_shared<SelectStatement>();
 
   // that's one query output column end of 'FROM'
   // we need parse constant or function or colname or table.col

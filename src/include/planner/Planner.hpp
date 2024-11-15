@@ -2,7 +2,7 @@
 
 #include "common/Context.hpp"
 #include "common/Status.hpp"
-#include "parser/statement/SelectStmt.hpp"
+#include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 
 namespace DB {
@@ -17,7 +17,7 @@ public:
 
   Status QueryPlan();
 
-  Status PlanSelect(SelectStmt &statement);
+  Status PlanSelect(SelectStatement &statement);
 
   AbstractPlanNodeRef GetPlanNode(BoundExpressRef plan);
 };
