@@ -7,7 +7,7 @@
 
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
-#include "common/ZeitgeistDB.hpp"
+#include "common/ZeitKert.hpp"
 #include "common/util/StringUtil.hpp"
 #include "function/Abs.hpp"
 #include "function/FunctionString.hpp"
@@ -18,7 +18,7 @@ void CheckerRegister();
 
 int main(int argc, char *argv[]) {
   CheckerRegister();
-  DB::ZeitgeistDB db;
+  DB::ZeitKert db;
   // We need to make sure that the lifecycle of the data held by slice is long
   // enough, So every time you execute a query, move the query's data around
   // to make sure the data pointer stays the same.
@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
   linenoiseHistorySetMaxLen(1024);
   linenoiseSetMultiLine(1);
 
-  std::cout << "Welcome to ZeitgeistDB!\n\n";
+  std::cout << "Welcome to ZeitKert!\n\n";
 
   auto prompt = "DB > ";
   while (true) {
@@ -88,6 +88,7 @@ void CheckerRegister() {
   Checker::RegisterKeyWord("INSERT");
   Checker::RegisterKeyWord("INTO");
   Checker::RegisterKeyWord("VALUES");
+  Checker::RegisterKeyWord("FROM");
 
   Checker::RegisterType("INT");
   // Checker::RegisterType("Varchar");

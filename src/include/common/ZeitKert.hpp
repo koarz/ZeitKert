@@ -13,7 +13,7 @@
 
 namespace DB {
 
-class ZeitgeistDB {
+class ZeitKert {
   std::shared_ptr<QueryContext> context_;
 
   Status HandleCreateStatement();
@@ -23,7 +23,7 @@ class ZeitgeistDB {
   Status HandleShowStatement(ResultSet &result_set);
 
 public:
-  ZeitgeistDB() : context_(std::make_shared<QueryContext>()) {}
+  ZeitKert() : context_(std::make_shared<QueryContext>()) {}
 
   Status ExecuteQuery(std::string &query, ResultSet &result_set) {
     query.pop_back();

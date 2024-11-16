@@ -1,6 +1,6 @@
-#include "common/ZeitgeistDB.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
+#include "common/ZeitKert.hpp"
 #include "parser/statement/CreateStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
 #include "parser/statement/UseStatement.hpp"
@@ -8,7 +8,7 @@
 #include <memory>
 
 namespace DB {
-Status ZeitgeistDB::HandleCreateStatement() {
+Status ZeitKert::HandleCreateStatement() {
   auto &create_Statement =
       static_cast<CreateStatement &>(*context_->sql_statement_);
   auto name = create_Statement.GetName();
@@ -24,7 +24,7 @@ Status ZeitgeistDB::HandleCreateStatement() {
   }
 }
 
-Status ZeitgeistDB::HandleUseStatement() {
+Status ZeitKert::HandleUseStatement() {
   auto &use_Statement = static_cast<UseStatement &>(*context_->sql_statement_);
   auto name = use_Statement.GetName();
   auto disk_manager = context_->disk_manager_;
@@ -37,7 +37,7 @@ Status ZeitgeistDB::HandleUseStatement() {
   return status;
 }
 
-Status ZeitgeistDB::HandleShowStatement(ResultSet &result_set) {
+Status ZeitKert::HandleShowStatement(ResultSet &result_set) {
   auto &show_Statement =
       static_cast<ShowStatement &>(*context_->sql_statement_);
   auto show_type = show_Statement.GetShowType();
