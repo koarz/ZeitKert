@@ -1,13 +1,13 @@
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
-#include "common/ZeitgeistDB.hpp"
+#include "common/ZeitKert.hpp"
 #include "linenoise.h"
 #include <chrono>
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
 TEST(create_database, DISABLED_create_new_database) {
-  DB::ZeitgeistDB db;
+  DB::ZeitKert db;
 
   DB::ResultSet res;
 
@@ -25,7 +25,7 @@ TEST(create_database, DISABLED_create_new_database) {
   }
 }
 TEST(create_database, DISABLED_create_database_error_for_exit) {
-  DB::ZeitgeistDB db;
+  DB::ZeitKert db;
 
   DB::ResultSet res;
   std::unique_ptr<int, std::function<void(int *)>> p(

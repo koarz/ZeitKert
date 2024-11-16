@@ -9,7 +9,7 @@
 #define USELSMENGINE
 #endif
 
-constexpr auto default_databases_dir = ".ZeitgeistDB";
+constexpr auto default_databases_dir = ".ZeitKert";
 
 using frame_id_t = int32_t;
 using timestamp_t = uint64_t;
