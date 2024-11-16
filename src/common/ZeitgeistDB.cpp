@@ -10,7 +10,7 @@
 namespace DB {
 Status ZeitgeistDB::HandleCreateStatement() {
   auto &create_Statement =
-      dynamic_cast<CreateStatement &>(*context_->sql_statement_);
+      static_cast<CreateStatement &>(*context_->sql_statement_);
   auto name = create_Statement.GetName();
   if (create_Statement.GetCreateType() == CreateType::TABLE) {
     if (context_->database_ == nullptr) {
@@ -25,7 +25,7 @@ Status ZeitgeistDB::HandleCreateStatement() {
 }
 
 Status ZeitgeistDB::HandleUseStatement() {
-  auto &use_Statement = dynamic_cast<UseStatement &>(*context_->sql_statement_);
+  auto &use_Statement = static_cast<UseStatement &>(*context_->sql_statement_);
   auto name = use_Statement.GetName();
   auto disk_manager = context_->disk_manager_;
   auto status = disk_manager->OpenDatabase(name);
@@ -39,7 +39,7 @@ Status ZeitgeistDB::HandleUseStatement() {
 
 Status ZeitgeistDB::HandleShowStatement(ResultSet &result_set) {
   auto &show_Statement =
-      dynamic_cast<ShowStatement &>(*context_->sql_statement_);
+      static_cast<ShowStatement &>(*context_->sql_statement_);
   auto show_type = show_Statement.GetShowType();
   Status status;
   switch (show_type) {

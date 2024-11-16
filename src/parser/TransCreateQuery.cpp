@@ -7,12 +7,12 @@ namespace DB {
 std::shared_ptr<CreateStatement>
 Transform::TransCreateQuery(ASTPtr node, std::string &message,
                             std::shared_ptr<QueryContext> context) {
-  auto &create_query = dynamic_cast<CreateQuery &>(*node);
+  auto &create_query = static_cast<CreateQuery &>(*node);
   auto name = create_query.GetName();
   auto type = create_query.GetType();
   std::vector<ColumnMetaRef> columns;
   if (type == CreateType::TABLE) {
-    auto &node_query = dynamic_cast<ASTToken &>(*create_query.children_[0]);
+    auto &node_query = static_cast<ASTToken &>(*create_query.children_[0]);
     auto it = node_query.Begin();
     while (it->type != TokenType::ClosingRoundBracket) {
       if (it->type == TokenType::Comma) {

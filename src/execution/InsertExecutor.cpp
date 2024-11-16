@@ -53,7 +53,7 @@ Status InsertExecutor::Execute() {
   auto res = std::make_shared<ColumnVector<int>>();
   res->Insert(inserted_row);
   this->schema_->GetColumns().push_back(std::make_shared<ColumnWithNameType>(
-      res, "Insert", std::make_shared<Int>()));
+      res, "InsertRows", std::make_shared<Int>()));
   return Status::OK();
 }
 } // namespace DB

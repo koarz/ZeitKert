@@ -29,9 +29,9 @@ public:
   // and write them to immutable page
   std::string Serilize();
 
-  Status Put(Slice key, Slice value);
+  Status Put(const Slice &key, const Slice &value);
 
-  Status Get(Slice key, Slice *value);
+  Status Get(const Slice &key, Slice *value);
 
   void RecoverFromWal();
 

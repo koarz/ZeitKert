@@ -28,7 +28,6 @@ struct BoundConstant : public BoundExpress {
     case ValueType::Type::Int: return std::to_string(value_.i32);
     case ValueType::Type::String: return {value_.str, size_};
     case ValueType::Type::Double: return std::to_string(value_.f64);
-    case ValueType::Type::Varchar:
     case ValueType::Type::Null: break;
     }
     return "_unknow_";

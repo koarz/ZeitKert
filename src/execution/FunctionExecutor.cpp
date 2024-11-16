@@ -48,7 +48,6 @@ Status FunctionExecutor::Execute() {
     res_data = std::make_shared<ColumnString>();
     break;
   case ValueType::Type::Null:
-  case ValueType::Type::Varchar: break;
   }
   std::string func_name =
       function_->GetName() + "(" + block.GetColumn(0)->GetColumnName();

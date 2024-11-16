@@ -8,9 +8,9 @@ namespace DB {
 std::shared_ptr<SelectStatement>
 Transform::TransSelectQuery(ASTPtr node, std::string &message,
                             std::shared_ptr<QueryContext> context) {
-  auto &select_query = dynamic_cast<SelectQuery &>(*node);
+  auto &select_query = static_cast<SelectQuery &>(*node);
 
-  auto &node_query = dynamic_cast<ASTToken &>(*select_query.children_[0]);
+  auto &node_query = static_cast<ASTToken &>(*select_query.children_[0]);
   std::vector<BoundExpressRef> columns;
   auto it = node_query.Begin();
   auto res = std::make_shared<SelectStatement>();

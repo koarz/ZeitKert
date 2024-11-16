@@ -6,21 +6,21 @@
 #include <cassert>
 
 namespace DB {
-Status MemTable::Put(Slice key, Slice value) {
+Status MemTable::Put(const Slice &key, const Slice &value) {
   auto add_size = key.Size() + value.Size() + 2 * sizeof(uint16_t);
   approximate_size_.fetch_add(add_size);
   skip_list_.Insert(key, value);
   return Status::OK();
 }
 
-Status MemTable::Get(Slice key, Slice *value) {
+Status MemTable::Get(const Slice &key, Slice *value) {
   return skip_list_.Get(key, value);
 }
 
 void MemTable::RecoverFromWal() {
   Slice key, value;
   while (wal_.ReadFromLogFile(&key, &value)) {
-    std::ignore = Put(std::move(key), std::move(value));
+    std::ignore = Put(key, value);
   }
 }
 
