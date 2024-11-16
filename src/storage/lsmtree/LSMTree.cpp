@@ -60,7 +60,7 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
   SkipList<Slice, Slice, SliceCompare> temp_list{16, SliceCompare{}};
   auto iterator = memtable_->MakeNewIterator();
   while (iterator.Valid()) {
-    temp_list.Insert(iterator.GetKey(), iterator.GetValue());
+    temp_list.Insert(iterator.GetKey(), iterator.GetValue(), false);
     iterator.Next();
   }
   lock.unlock();
@@ -69,7 +69,7 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
        it++) {
     iterator = (*it)->MakeNewIterator();
     while (iterator.Valid()) {
-      temp_list.Insert(iterator.GetKey(), iterator.GetValue());
+      temp_list.Insert(iterator.GetKey(), iterator.GetValue(), false);
       iterator.Next();
     }
   }
