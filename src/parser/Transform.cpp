@@ -3,6 +3,7 @@
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
+#include "parser/binder/BoundColumnRef.hpp"
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/binder/BoundFunction.hpp"
@@ -39,6 +40,10 @@ BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
   if (it->type == TokenType::Comma) {
     ++it;
     return GetColumnExpress(it, end, message);
+  }
+
+  if (it->type == TokenType::Asterisk) {
+    return std::make_shared<BoundColumnRef>("*");
   }
 
   if (it->type == TokenType::Minus) {

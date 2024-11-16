@@ -39,6 +39,7 @@ enum class ASTNodeType {
   TableRef,
   Function,
   InsertQuery,
+  TableNames,
   Token,
 };
 
@@ -51,6 +52,8 @@ enum class BoundExpressType {
   BoundConstant,
   BoundFunction,
   BoundTuple,
+  BoundColumnRef,
+  BoundColumnMeta,
 };
 
 enum class PlanType {

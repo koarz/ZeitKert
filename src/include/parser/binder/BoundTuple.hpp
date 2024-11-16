@@ -1,6 +1,7 @@
 #pragma once
 
 #include "parser/binder/BoundExpress.hpp"
+
 #include <vector>
 
 namespace DB {

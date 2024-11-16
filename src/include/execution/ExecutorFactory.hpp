@@ -4,12 +4,14 @@
 #include "execution/FunctionExecutor.hpp"
 #include "execution/InsertExecutor.hpp"
 #include "execution/ProjectionExecutor.hpp"
+#include "execution/ScanColumnExecutor.hpp"
 #include "execution/TupleExecutor.hpp"
 #include "execution/ValuesExecutor.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
 #include "planner/InsertPlanNode.hpp"
 #include "planner/ProjectionPlanNode.hpp"
+#include "planner/ScanColumnPlanNode.hpp"
 #include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
 #include <memory>
@@ -60,7 +62,11 @@ struct ExecutorFactory {
       return std::make_unique<TupleExecutor>(p.GetSchemaRef(),
                                              std::move(children));
     }
-    case PlanType::SeqScan:
+    case PlanType::SeqScan: {
+      auto &p = static_cast<ScanColumnPlanNode &>(*plan);
+      return std::make_unique<ScanColumnExecutor>(p.GetSchemaRef(),
+                                                  p.GetColumnMeta());
+    }
     case PlanType::IndexScan:
     case PlanType::Update:
     case PlanType::Delete:

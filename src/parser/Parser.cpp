@@ -6,6 +6,7 @@
 #include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
+#include "parser/ASTTableNames.hpp"
 #include "parser/ASTToken.hpp"
 #include "parser/ASTUseQuery.hpp"
 #include "parser/Checker.hpp"
@@ -15,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace DB {
 
@@ -43,7 +45,7 @@ Status Parser::Parse(TokenIterator &iterator) {
   } else {
     status = Status::Error(
         ErrorCode::SyntaxError,
-        "ZeitgeistDB Just Support CREATE, USE, SHOW, DROP, SELECT Query");
+        "ZeitKert Just Support CREATE, USE, SHOW, DROP, SELECT Query");
   }
   return status;
 }
@@ -118,11 +120,29 @@ SYNTAXERROR:
 Status Parser::ParseSelect(TokenIterator &iterator) {
   tree_ = std::make_shared<SelectQuery>();
   std::optional<TokenIterator> begin{++iterator};
-  // we dont support from order by...query now, so just
-  while (!(++iterator)->isEnd())
-    ;
+  bool have_from{};
+  while (!(++iterator)->isEnd()) {
+    std::string s{iterator->begin, iterator->end};
+    if (Checker::IsKeyWord(s)) {
+      if (s == "FROM") {
+        have_from = true;
+        break;
+      }
+    }
+  }
   std::optional<TokenIterator> end{iterator};
   tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
+  if (have_from) {
+    std::vector<std::string> names;
+    while (!(++iterator)->isEnd()) {
+      if (iterator->type == TokenType::Comma) {
+        continue;
+      }
+      names.emplace_back(iterator->begin, iterator->end);
+    }
+    tree_->children_.emplace_back(
+        std::make_shared<TableNames>(std::move(names)));
+  }
   return Status::OK();
 }
 
@@ -168,6 +188,7 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
           std::optional<TokenIterator> end{iterator};
           // values tuple
           tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
+        } else if (s == "SELECT") {
         }
       }
       return Status::OK();

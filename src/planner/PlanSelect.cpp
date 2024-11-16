@@ -19,6 +19,7 @@ Status Planner::PlanSelect(SelectStatement &satement) {
       temp_columns.push_back(column);
       continue;
     } else {
+      // if pre const value col is not empty
       if (!temp_columns.empty()) {
         columns.push_back(std::make_shared<ValuePlanNode>(
             std::make_shared<Schema>(), std::move(temp_columns)));

@@ -50,13 +50,16 @@ void SkipList<Key, Value, KeyCompare>::FindLessEqual(
 }
 
 template <typename Key, typename Value, typename KeyCompare>
-void SkipList<Key, Value, KeyCompare>::Insert(Key key, Value value) {
+void SkipList<Key, Value, KeyCompare>::Insert(Key key, Value value,
+                                              bool replace) {
   std::vector<std::shared_ptr<SkipListNode<Key, Value>>> lord;
   auto level = GetRandomLevel();
   FindLessEqual(root_, key, lord);
   if (*lord.rbegin() != root_ &&
       compere_((*lord.rbegin())->kv_.first, key) == 0) {
-    (*lord.rbegin())->kv_.second = value;
+    if (replace) {
+      (*lord.rbegin())->kv_.second = value;
+    }
     return;
   }
   std::shared_ptr<SkipListNode<Key, Value>> node =

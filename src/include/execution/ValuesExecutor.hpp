@@ -3,7 +3,6 @@
 #include "common/Status.hpp"
 #include "execution/AbstractExecutor.hpp"
 #include "planner/ValuePlanNode.hpp"
-#include <memory>
 
 namespace DB {
 class ValuesExecutor : public AbstractExecutor {

@@ -60,7 +60,7 @@ public:
     Insert(kv.first, kv.second);
   }
 
-  void Insert(Key key, Value value);
+  void Insert(Key key, Value value, bool replace = true);
 
   void Remove(Key key);
 

@@ -1,7 +1,9 @@
 #pragma once
 
 #include "common/Config.hpp"
+#include "common/Status.hpp"
 #include "storage/IndexEngine.hpp"
+#include "storage/column/Column.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SSTable.hpp"
 #include "storage/lsmtree/Slice.hpp"
@@ -16,6 +18,8 @@
 namespace DB {
 class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   std::shared_mutex latch_;
+  std::shared_mutex immutable_latch_;
+
   MemTableRef memtable_;
   std::vector<MemTableRef> immutable_table_;
   // level and pages mapping
@@ -40,6 +44,8 @@ public:
   Status Remove(const Slice &key) override;
 
   Status GetValue(const Slice &key, Slice *column) override;
+
+  Status ScanColumn(ColumnPtr &res);
 
   size_t GetImmutableSize() { return immutable_table_.size(); }
 };

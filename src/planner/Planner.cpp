@@ -2,12 +2,14 @@
 #include "catalog/Schema.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
+#include "parser/binder/BoundColumnMeta.hpp"
 #include "parser/binder/BoundFunction.hpp"
 #include "parser/binder/BoundTuple.hpp"
 #include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
+#include "planner/ScanColumnPlanNode.hpp"
 #include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
 #include <memory>
@@ -51,6 +53,13 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
     return std::make_shared<TuplePlanNode>(std::make_shared<Schema>(),
                                            std::move(abst_column));
   }
+  case BoundExpressType::BoundColumnMeta: {
+    auto &exp = static_cast<BoundColumnMeta &>(*expr);
+    return std::make_shared<ScanColumnPlanNode>(std::make_shared<Schema>(),
+                                                exp.GetColumnMeta());
+  }
+  // impossible
+  case BoundExpressType::BoundColumnRef:
   }
   return nullptr;
 }

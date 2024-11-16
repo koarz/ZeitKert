@@ -1,5 +1,6 @@
 #pragma once
 
+#include "catalog/meta/TableMeta.hpp"
 #include "parser/SQLStatement.hpp"
 #include "parser/binder/BoundExpress.hpp"
 
@@ -12,6 +13,6 @@ struct SelectStatement : public SQLStatement {
 
   std::vector<BoundExpressRef> columns_;
 
-  std::vector<BoundExpressRef> from_;
+  std::vector<TableMetaRef> from_;
 };
 } // namespace DB
