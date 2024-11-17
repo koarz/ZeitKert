@@ -35,9 +35,12 @@ struct Transform {
 
 private:
   static BoundExpressRef GetTupleExpress(TokenIterator begin, TokenIterator end,
+                                         std::vector<TableMetaRef> &tables,
                                          std::string &message);
 
   static BoundExpressRef GetColumnExpress(TokenIterator &it, TokenIterator end,
+                                          std::vector<TableMetaRef> &tables,
+                                          std::vector<BoundExpressRef> &columns,
                                           std::string &message);
 };
 } // namespace DB

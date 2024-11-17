@@ -60,8 +60,8 @@ struct StringUtil {
   // return 1 if str is table.column
   // return 0 if just column name
   // return -1 if the str have more than 1 '.'
-  static int SpliteTableColumn(std::string &str, std::string &table,
-                               std::string &column) {
+  static int SplitTableColumn(std::string &str, std::string &table,
+                              std::string &column) {
     if (std::count(str.begin(), str.end(), '.') > 1) {
       return -1;
     }

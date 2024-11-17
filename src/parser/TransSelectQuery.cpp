@@ -37,46 +37,12 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
   // that's one query output column end of 'FROM'
   // we need parse constant or function or colname or table.col
   while (it < node_query.End()) {
-    auto col = GetColumnExpress(it, node_query.End(), message);
+    auto col =
+        GetColumnExpress(it, node_query.End(), res->from_, columns, message);
     if (!message.empty()) {
       return nullptr;
     }
-    if (col->expr_type_ == BoundExpressType::BoundColumnRef) {
-      auto col_name = static_cast<BoundColumnRef &>(*col).GetColumnName();
-      if (col_name == "*") {
-        for (auto &table : res->from_) {
-          for (auto &col_meta : table->GetColumns()) {
-            columns.push_back(std::make_shared<BoundColumnMeta>(col_meta));
-          }
-        }
-      } else {
-        std::string table_name, column_name;
-        switch (
-            StringUtil::SpliteTableColumn(col_name, table_name, column_name)) {
-        case -1: {
-          message = fmt::format("your column: {} not correct", col_name);
-          return nullptr;
-        }
-        case 0: {
-          for (auto &table : res->from_) {
-            columns.push_back(std::make_shared<BoundColumnMeta>(
-                table->GetColumn(column_name)));
-          }
-          break;
-        }
-        case 1: {
-          for (auto &table : res->from_) {
-            if (table->GetTableName() == table_name) {
-              columns.push_back(std::make_shared<BoundColumnMeta>(
-                  table->GetColumn(column_name)));
-              break;
-            }
-          }
-          break;
-        }
-        }
-      }
-    } else {
+    if (col) {
       columns.push_back(col);
     }
     ++it;

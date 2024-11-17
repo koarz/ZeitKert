@@ -1,8 +1,10 @@
 #include "parser/Transform.hpp"
 #include "common/util/StringUtil.hpp"
+#include "fmt/format.h"
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
+#include "parser/binder/BoundColumnMeta.hpp"
 #include "parser/binder/BoundColumnRef.hpp"
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
@@ -19,31 +21,40 @@
 namespace DB {
 BoundExpressRef Transform::GetTupleExpress(TokenIterator begin,
                                            TokenIterator end,
+                                           std::vector<TableMetaRef> &tables,
                                            std::string &message) {
   if (begin->type != TokenType::OpeningRoundBracket ||
       end->type != TokenType::ClosingRoundBracket) {
     return nullptr;
   }
   auto tuple = std::make_shared<BoundTuple>();
-  while (++begin != end) {
-    tuple->elements_.emplace_back(GetColumnExpress(begin, end, message));
+  while (++begin <= end) {
+    auto col = GetColumnExpress(begin, end, tables, tuple->elements_, message);
+    if (col) {
+      tuple->elements_.emplace_back(col);
+    }
   }
   return tuple;
 }
 
-BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
-                                            TokenIterator end,
-                                            std::string &message) {
-  if (it == end) {
+BoundExpressRef Transform::GetColumnExpress(
+    TokenIterator &it, TokenIterator end, std::vector<TableMetaRef> &tables,
+    std::vector<BoundExpressRef> &columns, std::string &message) {
+  if (!(it < end)) {
     return nullptr;
   }
   if (it->type == TokenType::Comma) {
     ++it;
-    return GetColumnExpress(it, end, message);
+    return GetColumnExpress(it, end, tables, columns, message);
   }
 
   if (it->type == TokenType::Asterisk) {
-    return std::make_shared<BoundColumnRef>("*");
+    for (auto &table : tables) {
+      for (auto &col_meta : table->GetColumns()) {
+        columns.push_back(std::make_shared<BoundColumnMeta>(col_meta));
+      }
+    }
+    return nullptr;
   }
 
   if (it->type == TokenType::Minus) {
@@ -97,26 +108,52 @@ BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
       std::vector<BoundExpressRef> arguments;
       // the arguments may column, function, constant
       // so we need to recursive to get columnexpr
-      while ((++it)->type != TokenType::ClosingRoundBracket) {
-        auto arg = GetColumnExpress(it, end, message);
+      while (it < end && it->type != TokenType::ClosingRoundBracket) {
+        auto arg = GetColumnExpress(++it, end, tables, arguments, message);
         if (!message.empty()) {
           return nullptr;
         }
-        arguments.push_back(arg);
+        if (arg) {
+          arguments.push_back(arg);
+        }
       }
       return std::make_shared<BoundFunction>(Checker::GetFuncImpl(func_name),
                                              std::move(arguments));
     }
     if (it == end) {}
     // check is table.col ?
-    std::string str;
+    std::string col_name;
     if (it->type == TokenType::Dot) {
       ++it;
-      str = {temp_begin->begin, it->end};
+      col_name = {temp_begin->begin, it->end};
     } else {
-      str = {temp_begin->begin, temp_begin->end};
+      col_name = {temp_begin->begin, temp_begin->end};
     }
-    return std::make_shared<BoundColumnRef>(str);
+
+    std::string table_name, column_name;
+    switch (StringUtil::SplitTableColumn(col_name, table_name, column_name)) {
+    case -1: {
+      message = fmt::format("your column: {} not correct", col_name);
+      return nullptr;
+    }
+    case 0: {
+      for (auto &table : tables) {
+        columns.push_back(
+            std::make_shared<BoundColumnMeta>(table->GetColumn(column_name)));
+      }
+      break;
+    }
+    case 1: {
+      for (auto &table : tables) {
+        if (table->GetTableName() == table_name) {
+          columns.push_back(
+              std::make_shared<BoundColumnMeta>(table->GetColumn(column_name)));
+          break;
+        }
+      }
+      break;
+    }
+    }
   }
   return nullptr;
 }

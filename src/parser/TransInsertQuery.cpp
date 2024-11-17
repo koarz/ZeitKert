@@ -22,11 +22,12 @@ Transform::TransInsertQuery(ASTPtr node, std::string &message,
   auto tokens = static_cast<ASTToken &>(*insert_query.children_[0]);
   auto begin = tokens.Begin(), end = tokens.End();
   std::vector<BoundExpressRef> tuples;
+  std::vector<TableMetaRef> tables{table_meta};
   while (begin != end) {
     auto t = begin;
     while ((++begin)->type != TokenType::ClosingRoundBracket && !begin->isEnd())
       ;
-    auto tuple = GetTupleExpress(t, begin, message);
+    auto tuple = GetTupleExpress(t, begin, tables, message);
     if (message.size() != 0) {
       return nullptr;
     }
