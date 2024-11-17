@@ -1,4 +1,6 @@
 #include "common/EnumClass.hpp"
+#include "common/util/StringUtil.hpp"
+#include "fmt/format.h"
 #include "parser/AST.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTTableNames.hpp"
@@ -34,7 +36,7 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
 
   // that's one query output column end of 'FROM'
   // we need parse constant or function or colname or table.col
-  while (it != node_query.End()) {
+  while (it < node_query.End()) {
     auto col = GetColumnExpress(it, node_query.End(), message);
     if (!message.empty()) {
       return nullptr;
@@ -48,6 +50,31 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
           }
         }
       } else {
+        std::string table_name, column_name;
+        switch (
+            StringUtil::SpliteTableColumn(col_name, table_name, column_name)) {
+        case -1: {
+          message = fmt::format("your column: {} not correct", col_name);
+          return nullptr;
+        }
+        case 0: {
+          for (auto &table : res->from_) {
+            columns.push_back(std::make_shared<BoundColumnMeta>(
+                table->GetColumn(column_name)));
+          }
+          break;
+        }
+        case 1: {
+          for (auto &table : res->from_) {
+            if (table->GetTableName() == table_name) {
+              columns.push_back(std::make_shared<BoundColumnMeta>(
+                  table->GetColumn(column_name)));
+              break;
+            }
+          }
+          break;
+        }
+        }
       }
     } else {
       columns.push_back(col);

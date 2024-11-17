@@ -56,6 +56,24 @@ struct StringUtil {
     std::regex pattern("^[a-zA-Z0-9_]+$");
     return std::regex_match(str, pattern);
   }
+
+  // return 1 if str is table.column
+  // return 0 if just column name
+  // return -1 if the str have more than 1 '.'
+  static int SpliteTableColumn(std::string &str, std::string &table,
+                               std::string &column) {
+    if (std::count(str.begin(), str.end(), '.') > 1) {
+      return -1;
+    }
+    auto p = str.find('.');
+    if (p == std::string::npos) {
+      column = str;
+      return 0;
+    }
+    table = str.substr(0, p);
+    column = str.substr(p + 1);
+    return 1;
+  }
 };
 
 } // namespace DB

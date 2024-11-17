@@ -107,7 +107,16 @@ BoundExpressRef Transform::GetColumnExpress(TokenIterator &it,
       return std::make_shared<BoundFunction>(Checker::GetFuncImpl(func_name),
                                              std::move(arguments));
     }
+    if (it == end) {}
     // check is table.col ?
+    std::string str;
+    if (it->type == TokenType::Dot) {
+      ++it;
+      str = {temp_begin->begin, it->end};
+    } else {
+      str = {temp_begin->begin, temp_begin->end};
+    }
+    return std::make_shared<BoundColumnRef>(str);
   }
   return nullptr;
 }
