@@ -30,7 +30,10 @@ public:
 
   size_t Size() override { return data_.size(); }
 
-  size_t GetMaxElementSize() override { return max_element_size_; }
+  size_t GetMaxElementSize() override {
+    // 4 is Null
+    return std::max(max_element_size_, 4UL);
+  }
 
   T &operator[](size_t idx) { return data_[idx]; }
 

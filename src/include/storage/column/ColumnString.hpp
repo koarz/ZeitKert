@@ -37,7 +37,10 @@ public:
 
   size_t Size() override { return offset_.size(); }
 
-  size_t GetMaxElementSize() override { return max_element_size_; }
+  size_t GetMaxElementSize() override {
+    // 4 is Null
+    return std::max(max_element_size_, 4UL);
+  }
 
   std::string operator[](size_t idx) { return GetStrElement(idx); }
 
