@@ -52,7 +52,6 @@ enum class BoundExpressType {
   BoundConstant,
   BoundFunction,
   BoundTuple,
-  BoundColumnRef,
   BoundColumnMeta,
 };
 

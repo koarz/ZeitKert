@@ -5,7 +5,6 @@
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundColumnMeta.hpp"
-#include "parser/binder/BoundColumnRef.hpp"
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/binder/BoundFunction.hpp"

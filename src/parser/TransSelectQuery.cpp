@@ -7,7 +7,6 @@
 #include "parser/ASTToken.hpp"
 #include "parser/Transform.hpp"
 #include "parser/binder/BoundColumnMeta.hpp"
-#include "parser/binder/BoundColumnRef.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include <memory>
 

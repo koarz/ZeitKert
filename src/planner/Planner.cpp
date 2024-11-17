@@ -58,8 +58,6 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
     return std::make_shared<ScanColumnPlanNode>(std::make_shared<Schema>(),
                                                 exp.GetColumnMeta());
   }
-  // impossible
-  case BoundExpressType::BoundColumnRef:
   }
   return nullptr;
 }
