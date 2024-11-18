@@ -2,10 +2,6 @@
 
 #include "common/EnumClass.hpp"
 
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 namespace DB {
 
 class SQLStatement {

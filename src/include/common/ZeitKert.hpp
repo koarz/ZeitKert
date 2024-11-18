@@ -16,6 +16,8 @@ namespace DB {
 class ZeitKert {
   std::shared_ptr<QueryContext> context_;
 
+  Status HandleDropStatement();
+
   Status HandleCreateStatement();
 
   Status HandleUseStatement();
@@ -48,6 +50,9 @@ public:
       goto ExecuteEnd;
     case StatementType::SHOW_STATEMENT:
       status = HandleShowStatement(result_set);
+      goto ExecuteEnd;
+    case StatementType::DROP_STATEMENT:
+      status = HandleDropStatement();
       goto ExecuteEnd;
     case StatementType::INVALID_STATEMENT:
     case StatementType::SELECT_STATEMENT:

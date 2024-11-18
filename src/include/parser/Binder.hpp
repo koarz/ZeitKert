@@ -1,10 +1,11 @@
 #pragma once
 
+#include "common/Context.hpp"
 #include "parser/Parser.hpp"
 #include "parser/SQLStatement.hpp"
+
 #include <memory>
 #include <string_view>
-#include <vector>
 
 namespace DB {
 class Binder {

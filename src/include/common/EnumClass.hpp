@@ -26,6 +26,7 @@ enum class StatementType {
   SHOW_STATEMENT,
   SELECT_STATEMENT,
   INSERT_STATEMENT,
+  DROP_STATEMENT,
 };
 
 enum class ASTNodeType {
@@ -75,4 +76,9 @@ enum class PlanType {
   TopN,
   MockScan,
   InitCheck
+};
+
+enum class DropType {
+  Table,
+  Database,
 };

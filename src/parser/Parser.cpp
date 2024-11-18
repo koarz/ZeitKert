@@ -3,6 +3,7 @@
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
+#include "parser/ASTDropQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
@@ -12,6 +13,7 @@
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
+#include "parser/statement/DropStatement.hpp"
 
 #include <memory>
 #include <optional>
@@ -37,6 +39,7 @@ Status Parser::Parse(TokenIterator &iterator) {
     } else if (str == "SHOW") {
       status = ParseShow(iterator);
     } else if (str == "DROP") {
+      status = ParseDrop(iterator);
     } else if (str == "SELECT") {
       status = ParseSelect(iterator);
     } else if (str == "INSERT") {
@@ -45,7 +48,7 @@ Status Parser::Parse(TokenIterator &iterator) {
   } else {
     status = Status::Error(
         ErrorCode::SyntaxError,
-        "ZeitKert Just Support CREATE, USE, SHOW, DROP, SELECT Query");
+        "ZeitKert Just Support CREATE, USE, SHOW, DROP, SELECT, INSERT Query");
   }
   return status;
 }
@@ -146,27 +149,24 @@ Status Parser::ParseSelect(TokenIterator &iterator) {
   return Status::OK();
 }
 
-Status Parser::ParseDrop(Lexer &lexer, std::shared_ptr<QueryContext> context,
-                         ResultSet &result_set) {
-  auto token = lexer.nextToken();
-  while (token.type == TokenType::Whitespace) {
-    token = lexer.nextToken();
-  }
-  auto status = Status::OK();
-  std::string sv{token.begin, token.end};
+Status Parser::ParseDrop(TokenIterator &iterator) {
+  ++iterator;
+  std::string sv{iterator->begin, iterator->end};
 
   if (Checker::IsKeyWord(sv)) {
+    ++iterator;
+    std::string name{iterator->begin, iterator->end};
     if (sv == "DATABASE") {
-      lexer.nextToken();
-      token = lexer.nextToken();
-      std::string name{token.begin, token.end};
-      if (StringUtil::IsAlpha(name)) {
-        auto disk_manager = context->disk_manager_;
-        status = disk_manager->DropDatabase(name);
-      }
+      tree_ = std::make_shared<DropQuery>(DropType::Database, std::move(name));
+    } else if (sv == "TABLE") {
+      tree_ = std::make_shared<DropQuery>(DropType::Table, std::move(name));
+    } else {
+      return Status::Error(ErrorCode::SyntaxError,
+                           "Your query have syntax error");
     }
+    return Status::OK();
   }
-  return status;
+  return Status::Error(ErrorCode::SyntaxError, "Your query have syntax error");
 }
 
 Status Parser::ParseInsert(TokenIterator &iterator) {

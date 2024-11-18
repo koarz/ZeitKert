@@ -1,13 +1,40 @@
+#include "common/ZeitKert.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
-#include "common/ZeitKert.hpp"
 #include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/DropStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
 #include "parser/statement/UseStatement.hpp"
 
+#include <filesystem>
 #include <memory>
 
 namespace DB {
+Status ZeitKert::HandleDropStatement() {
+  auto &drop_statement =
+      static_cast<DropStatement &>(*context_->sql_statement_);
+  auto name = drop_statement.GetName();
+
+  std::filesystem::path table_path;
+
+  Status status = Status::OK();
+  switch (drop_statement.GetType()) {
+  case DropType::Table:
+    if (context_->database_ == nullptr) {
+      return Status::Error(ErrorCode::NotChoiceDatabase,
+                           "You have not choice a database");
+    }
+    table_path = context_->database_->GetPath() / name;
+    status = context_->disk_manager_->DropTable(table_path);
+    context_->database_->RemoveTable(name);
+    break;
+  case DropType::Database:
+    status = context_->disk_manager_->DropDatabase(name);
+    break;
+  }
+  return status;
+}
+
 Status ZeitKert::HandleCreateStatement() {
   auto &create_Statement =
       static_cast<CreateStatement &>(*context_->sql_statement_);

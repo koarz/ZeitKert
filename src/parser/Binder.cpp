@@ -1,7 +1,6 @@
 #include "parser/Binder.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
-#include "parser/SQLStatement.hpp"
 #include "parser/TokenIterator.hpp"
 #include "parser/Transform.hpp"
 
@@ -40,7 +39,11 @@ Status Binder::Parse(std::string_view query,
     break;
   case ASTNodeType::InsertQuery:
     statement_ = Transform::TransInsertQuery(parser_.tree_, message, context);
-  default: break;
+    break;
+  case ASTNodeType::DropQuery:
+    statement_ = Transform::TransDropQuery(parser_.tree_, message, context);
+    break;
+  default:
   }
   if (statement_ == nullptr) {
     return Status::Error(ErrorCode::BindError,

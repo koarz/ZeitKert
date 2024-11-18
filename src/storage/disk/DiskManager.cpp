@@ -27,16 +27,25 @@ Status DiskManager::CreateDatabase(std::string name) {
 Status DiskManager::DropDatabase(std::string &name) {
   auto path = path_ / name;
   try {
-    if (!std::filesystem::exists(path)) {
-      return Status::Error(ErrorCode::DropError, "The Database Is not Exist");
-    }
-    if (!std::filesystem::remove(path)) {
+    if (!std::filesystem::remove_all(path)) {
       return Status::Error(ErrorCode::DropError,
                            "The Database can't be dropped");
     }
   } catch (const std::filesystem::filesystem_error &e) {
     return Status::Error(ErrorCode::DropError,
-                         std::format("Error dropping database: {}", e.what()));
+                         std::format("Error drop database: {}", e.what()));
+  }
+  return Status::OK();
+}
+
+Status DiskManager::DropTable(std::filesystem::path table_path) {
+  try {
+    if (!std::filesystem::remove_all(table_path)) {
+      return Status::Error(ErrorCode::DropError, "The Table can't be dropped");
+    }
+  } catch (const std::filesystem::filesystem_error &e) {
+    return Status::Error(ErrorCode::DropError,
+                         std::format("Error drop table: {}", e.what()));
   }
   return Status::OK();
 }
@@ -44,7 +53,7 @@ Status DiskManager::DropDatabase(std::string &name) {
 Status DiskManager::ShowDatabase(ResultSet &result_set) {
   auto path = path_;
   if (!std::filesystem::exists(path)) {
-    return Status::Error(ErrorCode::CreateError, "The Database Is not Exist");
+    return Status::Error(ErrorCode::CreateError, "The Database dose not Exist");
   }
   result_set.schema_ = std::make_shared<Schema>();
   auto col = std::make_shared<ColumnString>();

@@ -5,6 +5,7 @@
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/DropStatement.hpp"
 #include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
@@ -32,6 +33,10 @@ struct Transform {
   static std::shared_ptr<InsertStatement>
   TransInsertQuery(ASTPtr node, std::string &message,
                    std::shared_ptr<QueryContext> context);
+
+  static std::shared_ptr<DropStatement>
+  TransDropQuery(ASTPtr node, std::string &message,
+                 std::shared_ptr<QueryContext> context);
 
 private:
   static BoundExpressRef GetTupleExpress(TokenIterator begin, TokenIterator end,

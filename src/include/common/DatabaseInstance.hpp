@@ -32,6 +32,10 @@ public:
   Status ShowTables(ResultSet &result_set);
 
   TableMetaRef GetTableMeta(std::string &table_name);
+
+  std::filesystem::path GetPath() { return path_; }
+
+  void RemoveTable(std::string name) { table_metas_.erase(name); }
 };
 
 } // namespace DB

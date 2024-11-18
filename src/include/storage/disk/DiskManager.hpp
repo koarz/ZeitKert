@@ -26,6 +26,8 @@ public:
 
   Status DropDatabase(std::string &name);
 
+  Status DropTable(std::filesystem::path table_path);
+
   Status ShowDatabase(ResultSet &result_set);
 
   Status OpenDatabase(std::string name);
