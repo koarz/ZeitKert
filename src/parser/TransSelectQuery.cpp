@@ -1,14 +1,9 @@
-#include "common/EnumClass.hpp"
-#include "common/util/StringUtil.hpp"
-#include "fmt/format.h"
 #include "parser/AST.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTTableNames.hpp"
 #include "parser/ASTToken.hpp"
 #include "parser/Transform.hpp"
-#include "parser/binder/BoundColumnMeta.hpp"
 #include "parser/statement/SelectStatement.hpp"
-#include <memory>
 
 namespace DB {
 std::shared_ptr<SelectStatement>

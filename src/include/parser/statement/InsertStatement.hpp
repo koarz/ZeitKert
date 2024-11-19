@@ -3,6 +3,8 @@
 #include "catalog/meta/TableMeta.hpp"
 #include "parser/SQLStatement.hpp"
 #include "parser/binder/BoundExpress.hpp"
+#include "parser/statement/SelectStatement.hpp"
+#include <memory>
 
 namespace DB {
 struct InsertStatement : public SQLStatement {
@@ -12,6 +14,8 @@ struct InsertStatement : public SQLStatement {
   ~InsertStatement() override = default;
 
   std::vector<BoundExpressRef> tuples_;
+
+  std::shared_ptr<SelectStatement> select_;
 
   TableMetaRef table_;
 };

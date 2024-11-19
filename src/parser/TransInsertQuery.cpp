@@ -19,25 +19,37 @@ Transform::TransInsertQuery(ASTPtr node, std::string &message,
     message = "the table not exist, please check table name";
     return nullptr;
   }
-  auto tokens = static_cast<ASTToken &>(*insert_query.children_[0]);
-  auto begin = tokens.Begin(), end = tokens.End();
-  std::vector<BoundExpressRef> tuples;
-  std::vector<TableMetaRef> tables{table_meta};
-  while (begin != end) {
-    auto t = begin;
-    while ((++begin)->type != TokenType::ClosingRoundBracket && !begin->isEnd())
-      ;
-    auto tuple = GetTupleExpress(t, begin, tables, message);
-    if (message.size() != 0) {
+  auto res = std::make_shared<InsertStatement>();
+  if (auto select_query = insert_query.GetSelect(); select_query != nullptr) {
+    // select
+    res->select_ = TransSelectQuery(select_query, message, context);
+    if (res->select_ == nullptr) {
       return nullptr;
     }
-    tuples.push_back(tuple);
-    while ((++begin)->type != TokenType::OpeningRoundBracket && !begin->isEnd())
-      ;
+    res->table_ = table_meta;
+  } else {
+    // values
+    auto tokens = static_cast<ASTToken &>(*insert_query.children_[0]);
+    auto begin = tokens.Begin(), end = tokens.End();
+    std::vector<BoundExpressRef> tuples;
+    std::vector<TableMetaRef> tables{table_meta};
+    while (begin != end) {
+      auto t = begin;
+      while ((++begin)->type != TokenType::ClosingRoundBracket &&
+             !begin->isEnd())
+        ;
+      auto tuple = GetTupleExpress(t, begin, tables, message);
+      if (message.size() != 0) {
+        return nullptr;
+      }
+      tuples.push_back(tuple);
+      while ((++begin)->type != TokenType::OpeningRoundBracket &&
+             !begin->isEnd())
+        ;
+    }
+    res->table_ = table_meta;
+    res->tuples_ = std::move(tuples);
   }
-  auto res = std::make_shared<InsertStatement>();
-  res->table_ = table_meta;
-  res->tuples_ = std::move(tuples);
   return res;
 }
 } // namespace DB

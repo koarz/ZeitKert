@@ -173,11 +173,10 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
   ++iterator;
   std::string s{iterator->begin, iterator->end};
   ++iterator;
-
+  Status status = Status::OK();
   if (Checker::IsKeyWord(s)) {
     if (s == "INTO") {
-      s = std::string{iterator->begin, iterator->end};
-      tree_ = std::make_shared<InsertQuery>(std::move(s));
+      std::string name = std::string{iterator->begin, iterator->end};
       ++iterator;
       s = std::string{iterator->begin, iterator->end};
       if (Checker::IsKeyWord(s)) {
@@ -187,8 +186,15 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
             ;
           std::optional<TokenIterator> end{iterator};
           // values tuple
+          tree_ = std::make_shared<InsertQuery>(std::move(name), nullptr);
           tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
         } else if (s == "SELECT") {
+          status = ParseSelect(iterator);
+          if (!status.ok()) {
+            return status;
+          }
+          tree_ =
+              std::make_shared<InsertQuery>(std::move(name), std::move(tree_));
         }
       }
       return Status::OK();
