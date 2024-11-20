@@ -19,10 +19,6 @@ void CheckerRegister();
 int main(int argc, char *argv[]) {
   CheckerRegister();
   DB::ZeitKert db;
-  // We need to make sure that the lifecycle of the data held by slice is long
-  // enough, So every time you execute a query, move the query's data around
-  // to make sure the data pointer stays the same.
-  std::map<int, std::string> history;
   int num{};
 
   linenoiseHistorySetMaxLen(1024);
@@ -32,7 +28,7 @@ int main(int argc, char *argv[]) {
 
   auto prompt = "DB > ";
   while (true) {
-    std::string &query = history[num++];
+    std::string query;
     bool first_line = true;
     while (true) {
       auto line_prompt = first_line ? prompt : ".. > ";
