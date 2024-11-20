@@ -195,14 +195,15 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
           }
           tree_ =
               std::make_shared<InsertQuery>(std::move(name), std::move(tree_));
+        } else {
+          goto SYNTAXERROR;
         }
+        return Status::OK();
       }
-      return Status::OK();
     }
   }
-
-  return Status::Error(ErrorCode::SyntaxError,
-                       "INSERT back should INTO keyword");
+SYNTAXERROR:
+  return Status::Error(ErrorCode::SyntaxError, "your query have syntax error");
 }
 
 } // namespace DB
