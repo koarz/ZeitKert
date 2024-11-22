@@ -3,17 +3,6 @@
 #include "execution/ProjectionExecutor.hpp"
 #include "common/Status.hpp"
 namespace DB {
-Status ProjectionExecutor::Init() {
-  Status status;
-  for (auto &child : children_) {
-    status = child->Init();
-    if (!status.ok()) {
-      return status;
-    }
-  }
-  return Status::OK();
-}
-
 Status ProjectionExecutor::Execute() {
   Status status;
   for (auto &child : children_) {

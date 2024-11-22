@@ -13,8 +13,6 @@ public:
 
   ~ScanColumnExecutor() override = default;
 
-  Status Init() override;
-
   Status Execute() override;
 };
 } // namespace DB

@@ -2,13 +2,10 @@
 #include "common/Status.hpp"
 #include "storage/column/Column.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
+
 #include <memory>
 
 namespace DB {
-Status ScanColumnExecutor::Init() {
-  return Status::OK();
-}
-
 Status ScanColumnExecutor::Execute() {
   ColumnPtr column;
   std::ignore = column_meta_->lsm_tree_->ScanColumn(column);

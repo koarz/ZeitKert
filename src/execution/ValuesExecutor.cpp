@@ -8,10 +8,6 @@
 #include <memory>
 
 namespace DB {
-Status ValuesExecutor::Init() {
-  return Status::OK();
-}
-
 Status ValuesExecutor::Execute() {
   for (auto &v : plan_->values_) {
     auto &value = static_cast<BoundConstant &>(*v);

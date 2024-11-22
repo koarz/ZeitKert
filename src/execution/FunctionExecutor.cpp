@@ -9,17 +9,6 @@
 #include <memory>
 
 namespace DB {
-Status FunctionExecutor::Init() {
-  Status status;
-  for (auto &child : children_) {
-    status = child->Init();
-    if (!status.ok()) {
-      return status;
-    }
-  }
-  return Status::OK();
-}
-
 Status FunctionExecutor::Execute() {
   Block block;
   Status status;

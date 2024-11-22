@@ -2,17 +2,6 @@
 #include "common/Status.hpp"
 
 namespace DB {
-Status TupleExecutor::Init() {
-  Status status;
-  for (auto &child : children_) {
-    status = child->Init();
-    if (!status.ok()) {
-      return status;
-    }
-  }
-  return Status::OK();
-}
-
 Status TupleExecutor::Execute() {
   Status status;
   for (auto &child : children_) {

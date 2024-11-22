@@ -14,8 +14,6 @@ public:
 
   virtual ~AbstractExecutor() = default;
 
-  virtual Status Init() = 0;
-
   virtual Status Execute() = 0;
 
   SchemaRef GetSchema() { return schema_; };

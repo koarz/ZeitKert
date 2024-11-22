@@ -8,17 +8,6 @@
 #include <vector>
 
 namespace DB {
-Status InsertExecutor::Init() {
-  Status status;
-  for (auto &child : children_) {
-    status = child->Init();
-    if (!status.ok()) {
-      return status;
-    }
-  }
-  return Status::OK();
-}
-
 Status InsertExecutor::Execute() {
   Status status;
   bool first{true};
@@ -37,8 +26,21 @@ Status InsertExecutor::Execute() {
     int i = 0;
     for (auto col : child->GetSchema()->GetColumns()) {
       for (int j = 0; j < col->Size(); j++) {
-        status = col_meta[i]->lsm_tree_->Insert(Slice{&begin_row, 4},
-                                                Slice{col->GetStrElement(j)});
+        switch (col->GetValueType()->GetType()) {
+        case ValueType::Type::Int:
+          status = col_meta[i]->lsm_tree_->Insert(
+              Slice{&begin_row, 4}, Slice{std::stoi(col->GetStrElement(j))});
+          break;
+        case ValueType::Type::String:
+          status = col_meta[i]->lsm_tree_->Insert(Slice{&begin_row, 4},
+                                                  Slice{col->GetStrElement(j)});
+          break;
+        case ValueType::Type::Double:
+          status = col_meta[i]->lsm_tree_->Insert(
+              Slice{&begin_row, 4}, Slice{std::stod(col->GetStrElement(j))});
+          break;
+        case ValueType::Type::Null:
+        }
         if (!status.ok()) {
           return status;
         }

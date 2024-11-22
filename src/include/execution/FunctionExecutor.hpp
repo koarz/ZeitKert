@@ -19,8 +19,6 @@ public:
       : AbstractExecutor(std::move(schema)), function_(function),
         children_(std::move(children)) {}
 
-  Status Init() override;
-
   Status Execute() override;
 };
 } // namespace DB

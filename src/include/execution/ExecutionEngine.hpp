@@ -10,7 +10,6 @@ public:
   Status Execute(AbstractPlanNodeRef plan) {
     auto executor = ExecutorFactory::CreateExecutor(plan);
     Status status;
-    status = executor->Init();
     status = executor->Execute();
     return status;
   }
