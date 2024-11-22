@@ -10,7 +10,10 @@
 #include <memory>
 
 namespace DB {
-
+// the skip list time complexity is log(n) every memtable size approximate 4MB
+// if just int value the key size + value size + length size is large than 12
+// byes so the data num must less than 500'000 for every memtable
+// log(500'000) about equal 19, so 8 level is big enough
 constexpr size_t DEFAULT_SKIP_LIST_LEVEL = 8;
 
 class MemTable {
@@ -20,8 +23,9 @@ class MemTable {
 
 public:
   MemTable() : skip_list_(DEFAULT_SKIP_LIST_LEVEL, SliceCompare{}) {}
-  MemTable(std::filesystem::path path)
-      : wal_(path), skip_list_(DEFAULT_SKIP_LIST_LEVEL, SliceCompare{}) {
+  MemTable(std::filesystem::path path, bool write_log)
+      : wal_(path, write_log),
+        skip_list_(DEFAULT_SKIP_LIST_LEVEL, SliceCompare{}) {
     RecoverFromWal();
   }
 
@@ -59,5 +63,5 @@ public:
   Iterator MakeNewIterator() { return Iterator{skip_list_.Begin()}; }
 };
 
-using MemTableRef = std::shared_ptr<MemTable>;
+using MemTableRef = std::unique_ptr<MemTable>;
 } // namespace DB

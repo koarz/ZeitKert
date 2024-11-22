@@ -17,6 +17,7 @@ enum class ErrorCode {
   NotFound,
   DataTooLarge,
   InsertError,
+  FileNotOpen,
 };
 
 enum class StatementType {

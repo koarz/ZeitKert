@@ -1,4 +1,5 @@
 #include "storage/lsmtree/LSMTree.hpp"
+#include "common/Config.hpp"
 #include "common/Status.hpp"
 #include "storage/column/Column.hpp"
 #include "storage/column/ColumnString.hpp"
@@ -6,6 +7,7 @@
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SkipList.hpp"
 #include "storage/lsmtree/Slice.hpp"
+
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -15,10 +17,10 @@ namespace DB {
 Status LSMTree::Insert(const Slice &key, const Slice &value) {
   std::unique_lock lock(latch_);
   auto size = memtable_->GetApproximateSize();
-  if (size >= 4096) {
+  if (size >= SSTABLE_SIZE) {
     std::unique_lock lock(immutable_latch_);
     immutable_table_.push_back(std::move(memtable_));
-    memtable_ = std::make_shared<MemTable>();
+    memtable_ = std::make_unique<MemTable>(column_path_, write_log_);
     // start checkpoint check
   }
   return memtable_->Put(key, value);
@@ -78,7 +80,7 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
   case ValueType::Type::Int: {
     auto col = std::make_shared<ColumnVector<int>>();
     while (it != temp_list.End()) {
-      col->Insert(std::stoi((*it).second.ToString()));
+      col->Insert(*reinterpret_cast<int *>((*it).second.GetData()));
       ++it;
     }
     res = col;
@@ -96,7 +98,7 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
   case ValueType::Type::Double: {
     auto col = std::make_shared<ColumnVector<double>>();
     while (it != temp_list.End()) {
-      col->Insert(std::stod((*it).second.ToString()));
+      col->Insert(*reinterpret_cast<double *>((*it).second.GetData()));
       ++it;
     }
     res = col;

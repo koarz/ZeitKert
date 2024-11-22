@@ -25,6 +25,16 @@ public:
   explicit Database(std::filesystem::path path,
                     std::shared_ptr<DiskManager> disk_manager,
                     std::shared_ptr<BufferPoolManager> buffer_pool_manager);
+  ~Database() {
+    // save all table meta
+    for (auto &[name, meta] : table_metas_) {
+      std::string s = meta->Serialize();
+      std::ofstream meta_file(path_ / name / TableMeta::default_table_meta_name,
+                              std::ios::binary | std::ios::trunc);
+      meta_file.write(s.data(), s.size());
+      meta_file.close();
+    }
+  }
 
   Status CreateTable(std::string &table_name,
                      std::vector<std::shared_ptr<ColumnMeta>> &columns);

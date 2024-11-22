@@ -2,16 +2,19 @@
 #include "common/Status.hpp"
 #include "storage/lsmtree/Slice.hpp"
 
+#include <random>
+
 namespace DB {
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 uint32_t SkipList<Key, Value, KeyCompare>::GetRandomLevel() {
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<> distrib(1, max_level_);
-  return distrib(gen);
+  std::geometric_distribution<> distrib;
+  // make sure not 0
+  return distrib(gen) % max_level_ ?: 1;
 }
 
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 void SkipList<Key, Value, KeyCompare>::FindLess(
     std::shared_ptr<SkipListNode<Key, Value>> node, Key &key,
     std::vector<std::shared_ptr<SkipListNode<Key, Value>>> &lord) {
@@ -28,7 +31,7 @@ void SkipList<Key, Value, KeyCompare>::FindLess(
   }
 }
 
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 void SkipList<Key, Value, KeyCompare>::FindLessEqual(
     std::shared_ptr<SkipListNode<Key, Value>> node, const Key &key,
     std::vector<std::shared_ptr<SkipListNode<Key, Value>>> &lord) {
@@ -49,7 +52,7 @@ void SkipList<Key, Value, KeyCompare>::FindLessEqual(
   }
 }
 
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 void SkipList<Key, Value, KeyCompare>::Insert(Key key, Value value,
                                               bool replace) {
   std::vector<std::shared_ptr<SkipListNode<Key, Value>>> lord;
@@ -74,7 +77,7 @@ void SkipList<Key, Value, KeyCompare>::Insert(Key key, Value value,
   node->kv_ = std::make_pair(key, value);
 }
 
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 void SkipList<Key, Value, KeyCompare>::Remove(Key key) {
   std::vector<std::shared_ptr<SkipListNode<Key, Value>>> lord;
   FindLess(root_, key, lord);
@@ -93,7 +96,7 @@ void SkipList<Key, Value, KeyCompare>::Remove(Key key) {
   }
 }
 
-template <typename Key, typename Value, typename KeyCompare>
+SKIP_LIST_TEMPLATE_HEAD
 Status SkipList<Key, Value, KeyCompare>::Get(Key key, Value *value) {
   std::vector<std::shared_ptr<SkipListNode<Key, Value>>> lord;
   FindLessEqual(root_, key, lord);

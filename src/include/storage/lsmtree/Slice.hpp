@@ -28,6 +28,10 @@ public:
     memcpy(data_, str.data(), size_);
   }
 
+  Slice(int i) : data_(new Byte[4]), size_(4) { memcpy(data_, &i, size_); }
+
+  Slice(double d) : data_(new Byte[8]), size_(8) { memcpy(data_, &d, size_); }
+
   Slice(const Slice &other) {
     data_ = new Byte[other.size_];
     size_ = other.size_;
@@ -67,18 +71,16 @@ public:
   std::string Serilize() const {
     Byte s[sizeof(size_)]{};
     SliceUtil::EncodeUint16(s, size_);
-    return std::string(reinterpret_cast<char *>(s), sizeof(s)) + ToString();
+    return std::string(s, sizeof(s)) + ToString();
   }
 
   size_t Size() const { return size_; }
 
-  std::byte *GetData() const { return data_; }
+  Byte *GetData() const { return data_; }
 
   bool IsEmpty() const { return size_ == 0; }
 
-  std::string ToString() const {
-    return std::string(reinterpret_cast<char *>(data_), size_);
-  }
+  std::string ToString() const { return std::string(data_, size_); }
 };
 
 struct SliceCompare {

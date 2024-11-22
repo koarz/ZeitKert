@@ -7,6 +7,8 @@
 
 namespace DB {
 struct StringUtil {
+  StringUtil() = delete;
+  StringUtil(const StringUtil &) = delete;
 
   static bool StartsWith(const std::string &str, const std::string &prefix) {
     return std::equal(prefix.begin(), prefix.end(), str.begin());

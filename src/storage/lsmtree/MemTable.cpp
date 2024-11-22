@@ -7,10 +7,11 @@
 
 namespace DB {
 Status MemTable::Put(const Slice &key, const Slice &value) {
-  auto add_size = key.Size() + value.Size() + 2 * sizeof(uint16_t);
+  auto add_size = key.Size() + value.Size() + 4;
   approximate_size_.fetch_add(add_size);
   skip_list_.Insert(key, value);
-  return Status::OK();
+  auto status = wal_.WriteSlice(key, value);
+  return status;
 }
 
 Status MemTable::Get(const Slice &key, Slice *value) {
@@ -20,7 +21,9 @@ Status MemTable::Get(const Slice &key, Slice *value) {
 void MemTable::RecoverFromWal() {
   Slice key, value;
   while (wal_.ReadFromLogFile(&key, &value)) {
-    std::ignore = Put(key, value);
+    auto add_size = key.Size() + value.Size() + 4;
+    approximate_size_.fetch_add(add_size);
+    skip_list_.Insert(key, value);
   }
 }
 

@@ -20,6 +20,7 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   std::shared_mutex latch_;
   std::shared_mutex immutable_latch_;
 
+  bool write_log_;
   MemTableRef memtable_;
   std::vector<MemTableRef> immutable_table_;
   // level and pages mapping
@@ -32,10 +33,11 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
 public:
   LSMTree(std::filesystem::path column_path,
           std::shared_ptr<BufferPoolManager> buffer_pool_manager,
-          std::shared_ptr<ValueType> value_type)
+          std::shared_ptr<ValueType> value_type, bool write_log = true)
       : IndexEngine(SliceCompare{}, std::move(column_path),
                     std::move(buffer_pool_manager), std::move(value_type)),
-        memtable_(std::make_shared<MemTable>()) {}
+        write_log_(write_log),
+        memtable_(std::make_unique<MemTable>(column_path_, write_log)) {}
 
   ~LSMTree() override = default;
 

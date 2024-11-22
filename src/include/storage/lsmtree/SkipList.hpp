@@ -1,9 +1,8 @@
 #pragma once
 
 #include "common/Status.hpp"
+
 #include <memory>
-#include <random>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -14,7 +13,12 @@ template <typename Key, typename Value> struct SkipListNode {
   SkipListNode(uint32_t level) : next_(level, nullptr) {}
 };
 
-template <typename Key, typename Value, typename KeyCompare> class SkipList {
+#define SKIP_LIST_TEMPLATE_HEAD                                                \
+  template <typename Key, typename Value, typename KeyCompare>                 \
+    requires requires(Key k1, Key k2, KeyCompare compare) { compare(k1, k2); }
+
+SKIP_LIST_TEMPLATE_HEAD
+class SkipList {
   const uint32_t max_level_;
   // 0 equal 1 greater -1 less
   KeyCompare compere_;
