@@ -34,7 +34,7 @@ public:
 
   void StartWriteLog() { write_log_ = true; }
 
-  void StopWriteLof() { write_log_ = false; }
+  void StopWriteLog() { write_log_ = false; }
 
   Status WriteSlice(const Slice &key, const Slice &value);
 
