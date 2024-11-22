@@ -3,7 +3,7 @@ add_rules("plugin.compile_commands.autoupdate", {outputdir = ".vscode"})
 set_languages("c++23")
 set_project("ZeitKert")
 set_version("0.1")
-add_includedirs("src/include")
+add_includedirs("src")
 set_toolchains("clang")
 
 add_requires("linenoise", "simdjson", "rapidjson", "gtest", "fmt")
