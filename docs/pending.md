@@ -11,4 +11,7 @@
 - [ ] Complete Select Query
 - [ ] Explain Query
 - [ ] Create Index
-- [ ] Optimise 
+- [ ] Optimizing Performance 
+- [ ] Primary Key
+- [ ] Batch Insert
+- [ ] Multi-table Join Query
