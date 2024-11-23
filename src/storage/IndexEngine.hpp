@@ -2,7 +2,6 @@
 
 #include "buffer/BufferPoolManager.hpp"
 #include "common/Status.hpp"
-#include "storage/column/Column.hpp"
 
 #include <filesystem>
 #include <memory>

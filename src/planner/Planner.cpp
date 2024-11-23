@@ -12,6 +12,7 @@
 #include "planner/ScanColumnPlanNode.hpp"
 #include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
+
 #include <memory>
 #include <vector>
 

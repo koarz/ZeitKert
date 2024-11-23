@@ -2,7 +2,6 @@
 
 #include "catalog/Schema.hpp"
 #include "common/EnumClass.hpp"
-#include "parser/binder/BoundExpress.hpp"
 #include "planner/AbstractPlanNode.hpp"
 
 #include <memory>

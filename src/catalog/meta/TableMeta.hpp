@@ -1,7 +1,6 @@
 #pragma once
 
 #include "catalog/meta/ColumnMeta.hpp"
-#include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 #include "simdjson.h"

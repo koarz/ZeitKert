@@ -1,6 +1,7 @@
 #pragma once
 
 #include "storage/column/ColumnWithNameType.hpp"
+
 #include <cstddef>
 #include <format>
 #include <iostream>

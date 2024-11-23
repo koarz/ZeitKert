@@ -2,6 +2,7 @@
 
 #include "catalog/Schema.hpp"
 #include "common/Status.hpp"
+
 #include <memory>
 
 namespace DB {

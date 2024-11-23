@@ -1,6 +1,5 @@
 #include "execution/InsertExecutor.hpp"
 #include "common/Status.hpp"
-#include "storage/column/Column.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/lsmtree/Slice.hpp"
 

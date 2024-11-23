@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/EnumClass.hpp"
+
 #include <memory>
 #include <vector>
 

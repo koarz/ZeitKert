@@ -17,6 +17,10 @@ public:
 
   ~InsertExecutor() override = default;
 
+  // TODO:
+  // insert may suffer concurrency error
+  // when some insert executor insert to one column at same time
+  // so we need version control to save newest data
   Status Execute() override;
 };
 } // namespace DB

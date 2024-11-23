@@ -2,9 +2,8 @@
 #include "buffer/replacer/LRUReplacer.hpp"
 #include "common/Config.hpp"
 #include "common/Status.hpp"
-#include "fmt/format.h"
 #include "storage/Page.hpp"
-#include <algorithm>
+
 #include <memory>
 #include <mutex>
 #include <tuple>

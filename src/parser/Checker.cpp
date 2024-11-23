@@ -1,4 +1,5 @@
 #include "parser/Checker.hpp"
+#include "common/util/StringUtil.hpp"
 
 namespace DB {
 // static member need define on cpp file

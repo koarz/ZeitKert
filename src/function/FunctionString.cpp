@@ -1,6 +1,7 @@
 #include "function/FunctionString.hpp"
 #include "common/util/StringUtil.hpp"
 #include "storage/column/ColumnString.hpp"
+
 #include <cctype>
 
 namespace DB {

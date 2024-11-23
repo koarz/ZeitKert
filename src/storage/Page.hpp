@@ -2,7 +2,6 @@
 
 #include "common/Config.hpp"
 
-#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <shared_mutex>

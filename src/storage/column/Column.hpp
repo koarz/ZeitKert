@@ -1,7 +1,5 @@
 #pragma once
 
-#include "type/ValueType.hpp"
-
 #include <memory>
 
 namespace DB {

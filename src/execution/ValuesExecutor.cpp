@@ -5,6 +5,7 @@
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
+
 #include <memory>
 
 namespace DB {

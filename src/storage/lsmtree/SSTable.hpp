@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/Config.hpp"
 #include "storage/lsmtree/Slice.hpp"
 
 #include <cstdint>

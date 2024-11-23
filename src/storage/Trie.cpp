@@ -6,8 +6,9 @@ void Trie::Insert(std::string_view source) {
   std::shared_ptr<TrieNode> node = root_;
   for (auto &c : source) {
     auto &next_level = node->next_level_;
-    if (auto &&ite = std::find_if(next_level.begin(), next_level.end(),
-                                  [&](auto &pair) { return pair.first == c; });
+    if (auto &&ite =
+            std::ranges::find_if(next_level.begin(), next_level.end(),
+                                 [&](auto &pair) { return pair.first == c; });
 
         ite != next_level.end()) {
       node = ite->second;
@@ -39,8 +40,9 @@ std::shared_ptr<TrieNode> Trie::FindNodeHelper(std::string_view source) {
   std::shared_ptr<TrieNode> node = root_;
   for (auto &c : source) {
     auto &next_level = node->next_level_;
-    if (auto &&ite = std::find_if(next_level.begin(), next_level.end(),
-                                  [&](auto &pair) { return pair.first == c; });
+    if (auto &&ite =
+            std::ranges::find_if(next_level.begin(), next_level.end(),
+                                 [&](auto &pair) { return pair.first == c; });
         ite != next_level.end()) {
       node = ite->second;
     } else {

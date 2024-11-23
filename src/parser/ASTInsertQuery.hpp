@@ -1,8 +1,6 @@
 #pragma once
 
 #include "parser/AST.hpp"
-#include "parser/ASTSelectQuery.hpp"
-#include <memory>
 
 namespace DB {
 // if InsertQuery is insert into values, it just have a token child

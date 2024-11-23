@@ -3,7 +3,6 @@
 #include "buffer/BufferPoolManager.hpp"
 #include "catalog/meta/ColumnMeta.hpp"
 #include "catalog/meta/TableMeta.hpp"
-#include "common/Config.hpp"
 #include "common/Instance.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"

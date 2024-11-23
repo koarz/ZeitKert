@@ -1,8 +1,6 @@
 #include <chrono>
-#include <cstddef>
 #include <iostream>
 #include <memory>
-#include <set>
 #include <string>
 
 #include "common/ResultSet.hpp"

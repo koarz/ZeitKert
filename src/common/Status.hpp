@@ -2,7 +2,6 @@
 
 #include "common/EnumClass.hpp"
 
-#include <format>
 #include <memory>
 #include <string>
 

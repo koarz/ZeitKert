@@ -1,7 +1,6 @@
 #include "parser/Parser.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
-#include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
 #include "parser/ASTDropQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
@@ -13,7 +12,6 @@
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
-#include "parser/statement/DropStatement.hpp"
 
 #include <memory>
 #include <optional>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/util/StringUtil.hpp"
 #include "function/Function.hpp"
 #include "storage/Trie.hpp"
 
