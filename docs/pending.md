@@ -1,0 +1,14 @@
+# A list of pending task
+- [ ] SSTable Read Write
+- [ ] SSTable Compression
+- [ ] MVCC
+- [ ] SnapShot
+- [ ] Filter
+- [ ] Recovery
+- [ ] Optimiser
+- [ ] Delete Query
+- [ ] Update Query
+- [ ] Complete Select Query
+- [ ] Explain Query
+- [ ] Create Index
+- [ ] Optimise 
