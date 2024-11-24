@@ -15,3 +15,4 @@
 - [ ] Primary Key
 - [ ] Batch Insert
 - [ ] Multi-table Join Query
+- [ ] Binary Operator(+ - * / % ...)
