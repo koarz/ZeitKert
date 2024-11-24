@@ -7,6 +7,8 @@
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SkipList.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "storage/lsmtree/iterator/MemTableIterator.hpp"
+#include "storage/lsmtree/iterator/MergeIterator.hpp"
 
 #include <memory>
 #include <mutex>
@@ -14,7 +16,20 @@
 #include <string>
 
 namespace DB {
+void LSMTree::ReadSSTableMeta() {}
+
 Status LSMTree::Insert(const Slice &key, const Slice &value) {
+  if (value.Size() > 0x4000) {
+    // make life easy
+    // every block have 32k bytes data
+    // if store too large data, we need splite it to another block
+    // it will be introduce new flag for data block
+    // i dont want to do it at now
+    // IMPORTANT: Don't use string type as primary key, ban it!
+    return Status::Error(
+        ErrorCode::InsertError,
+        "Your data too large, please split it to less than 16384 bytes");
+  }
   std::unique_lock lock(latch_);
   auto size = memtable_->GetApproximateSize();
   if (size >= SSTABLE_SIZE) {
@@ -22,6 +37,8 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
     immutable_table_.push_back(std::move(memtable_));
     memtable_ = std::make_unique<MemTable>(column_path_, write_log_);
     // start checkpoint check
+    // when wal file size >= 4MB start cpmpaction
+    // 4MB / 32KB = 128 so if immutable num = 128 start it
   }
   return memtable_->Put(key, value);
 }
@@ -58,48 +75,42 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
 }
 
 Status LSMTree::ScanColumn(ColumnPtr &res) {
-  std::shared_lock lock(latch_);
-  SkipList<Slice, Slice, SliceCompare> temp_list{16, SliceCompare{}};
-  auto iterator = memtable_->MakeNewIterator();
-  while (iterator.Valid()) {
-    temp_list.Insert(iterator.GetKey(), iterator.GetValue(), false);
-    iterator.Next();
-  }
-  lock.unlock();
-  lock = std::shared_lock(immutable_latch_);
+  // TODO: add lock for every memtable
+  std::shared_lock lock1(latch_), lock2(immutable_latch_);
+  std::vector<std::shared_ptr<Iterator>> iters;
+  SkipList<Slice, Slice, SliceCompare> temp_list{8, SliceCompare{}};
+  iters.push_back(
+      std::make_shared<MemTableIterator>(memtable_->MakeNewIterator()));
   for (auto it = immutable_table_.rbegin(); it != immutable_table_.rend();
        it++) {
-    iterator = (*it)->MakeNewIterator();
-    while (iterator.Valid()) {
-      temp_list.Insert(iterator.GetKey(), iterator.GetValue(), false);
-      iterator.Next();
-    }
+    iters.push_back(
+        std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
   }
-  auto it = temp_list.Begin();
+  MergeIterator it(std::move(iters));
   switch (value_type_->GetType()) {
   case ValueType::Type::Int: {
     auto col = std::make_shared<ColumnVector<int>>();
-    while (it != temp_list.End()) {
-      col->Insert(*reinterpret_cast<int *>((*it).second.GetData()));
-      ++it;
+    while (it.Valid()) {
+      col->Insert(*reinterpret_cast<int *>(it.GetValue().GetData()));
+      it.Next();
     }
     res = col;
     break;
   }
   case ValueType::Type::String: {
     auto col = std::make_shared<ColumnString>();
-    while (it != temp_list.End()) {
-      col->Insert((*it).second.ToString());
-      ++it;
+    while (it.Valid()) {
+      col->Insert(it.GetValue().ToString());
+      it.Next();
     }
     res = col;
     break;
   }
   case ValueType::Type::Double: {
     auto col = std::make_shared<ColumnVector<double>>();
-    while (it != temp_list.End()) {
-      col->Insert(*reinterpret_cast<double *>((*it).second.GetData()));
-      ++it;
+    while (it.Valid()) {
+      col->Insert(*reinterpret_cast<double *>(it.GetValue().GetData()));
+      it.Next();
     }
     res = col;
     break;

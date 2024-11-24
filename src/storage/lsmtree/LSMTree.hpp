@@ -22,11 +22,14 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
 
   bool write_log_;
   MemTableRef memtable_;
+  // TODO:
+  // the immutable table may reading by other threads
+  // so we need safely delete them when immutable was full
   std::vector<MemTableRef> immutable_table_;
   // level and pages mapping
-  std::unordered_map<uint32_t, std::vector<page_id_t>> levels_;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> levels_;
   // page id
-  std::map<page_id_t, SSTableRef> sstables_;
+  std::map<uint32_t, SSTableRef> sstables_;
 
   void ReadSSTableMeta();
 

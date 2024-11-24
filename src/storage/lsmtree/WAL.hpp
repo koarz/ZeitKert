@@ -10,6 +10,10 @@
 namespace DB {
 // Write Ahead Log
 class WAL {
+  // TODO:
+  // when write immutable table start, we need a new file to become wal
+  // if system crashed we need read old file first
+
   // WARNING:
   // lsm tree write log signal can't trans to their
   bool write_log_;

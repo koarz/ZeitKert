@@ -4,6 +4,7 @@
 #include "storage/lsmtree/SkipList.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/WAL.hpp"
+#include "storage/lsmtree/iterator/MemTableIterator.hpp"
 
 #include <atomic>
 #include <cstddef>
@@ -41,26 +42,9 @@ public:
 
   size_t GetApproximateSize() { return approximate_size_; }
 
-  class Iterator {
-    SkipList<Slice, Slice, SliceCompare>::Iterator it_;
-
-  public:
-    Iterator(SkipList<Slice, Slice, SliceCompare>::Iterator it) : it_(it) {}
-    void Next() {
-      if (Valid())
-        ++it_;
-    }
-
-    bool Valid() {
-      return it_ != SkipList<Slice, Slice, SliceCompare>::Iterator(nullptr);
-    }
-
-    Slice &GetKey() { return (*it_).first; }
-
-    Slice &GetValue() { return (*it_).second; }
-  };
-
-  Iterator MakeNewIterator() { return Iterator{skip_list_.Begin()}; }
+  MemTableIterator MakeNewIterator() {
+    return MemTableIterator{skip_list_.Begin()};
+  }
 };
 
 using MemTableRef = std::unique_ptr<MemTable>;
