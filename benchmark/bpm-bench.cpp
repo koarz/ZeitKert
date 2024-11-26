@@ -115,7 +115,7 @@ int main() {
     if (!status.ok()) {
       std::cerr << status.GetMessage() << '\n';
     }
-    uint8_t &ch = page->GetData()[i % 1024];
+    Byte &ch = page->GetData()[i % 1024];
     ch = 1;
     page->SetDirty(true);
 
@@ -148,7 +148,7 @@ int main() {
               continue;
             }
 
-            uint8_t &ch = page->GetData()[page_idx % 1024];
+            Byte &ch = page->GetData()[page_idx % 1024];
             auto latch = page->GetWriteLock();
             page->SetDirty(true);
             ch += 1;
