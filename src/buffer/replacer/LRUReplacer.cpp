@@ -14,7 +14,7 @@ LRUReplacer::~LRUReplacer() {
 }
 
 void LRUReplacer::Access(frame_id_t frame_id) {
-  list_[frame_id].time_stamp_ = curr_timestamp_++;
+  list_[frame_id].time_stamp_ = ++curr_timestamp_;
   Pin(frame_id);
 }
 
@@ -23,6 +23,10 @@ void LRUReplacer::Evict(frame_id_t *frame_id) {
   for (int i = 0; i < frame_num_; i++) {
     if (list_[i].pin_count_ > 0) {
       continue;
+    }
+    if (list_[i].time_stamp_ == 0) {
+      *frame_id = i;
+      return;
     }
     if (idx == -1 || list_[i].time_stamp_ < list_[idx].time_stamp_) {
       idx = i;

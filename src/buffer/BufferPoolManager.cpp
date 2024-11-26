@@ -55,8 +55,7 @@ Status BufferPoolManager::FetchPage(std::filesystem::path column_path,
   if (page->page_id_ != INVALID_PAGE_ID) {
     auto &fs = path_map_[page->GetPath()];
     if (!fs.is_open()) {
-      fs.open(page->GetPath(),
-              std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
+      fs.open(page->GetPath(), std::ios::out);
       fs.close();
       fs.open(page->GetPath(), std::ios::binary | std::ios::in | std::ios::out);
     }
@@ -72,8 +71,7 @@ Status BufferPoolManager::FetchPage(std::filesystem::path column_path,
   page->is_dirty_ = false;
   page->path_ = column_path;
   if (!fs.is_open()) {
-    fs.open(page->GetPath(),
-            std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
+    fs.open(page->GetPath(), std::ios::out);
     fs.close();
     fs.open(page->GetPath(), std::ios::binary | std::ios::in | std::ios::out);
   }
@@ -102,8 +100,7 @@ Status BufferPoolManager::FlushPage(frame_id_t frame_id) {
   Status status;
   auto &fs = path_map_[page.GetPath()];
   if (!fs.is_open()) {
-    fs.open(page.GetPath(),
-            std::ios::binary | std::ios::in | std::ios::app | std::ios::out);
+    fs.open(page.GetPath(), std::ios::out);
     fs.close();
     fs.open(page.GetPath(), std::ios::binary | std::ios::in | std::ios::out);
   }

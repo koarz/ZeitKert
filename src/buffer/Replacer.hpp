@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/Config.hpp"
+
 #include <cstdint>
 
 namespace DB {
