@@ -41,26 +41,30 @@ public:
     for (const auto &column : json["columns"]) {
       auto name = column["name"].get_string().value();
       auto type = column["type"].get_string().value();
-      auto page_num =
-          std::stoull(std::string(column["page_number"].get_string().value()));
+      auto table_number =
+          std::stoull(std::string(column["table_number"].get_string().value()));
       // auto nullable = column["nullable"].get_bool();
       if (type == "int") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Int>(), page_num,
-            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
+            std::string(name), std::make_shared<Int>(),
+            std::make_shared<LSMTree>(table_path / name, table_number,
+                                      buffer_pool_manager,
                                       std::make_shared<Int>())));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "string") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<String>(), page_num,
-            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
+            std::string(name), std::make_shared<String>(),
+            std::make_shared<LSMTree>(table_path / name, table_number,
+                                      buffer_pool_manager,
                                       std::make_shared<String>())));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "double") {
-        columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Double>(), page_num,
-            std::make_shared<LSMTree>(table_path / name, buffer_pool_manager,
-                                      std::make_shared<Double>())));
+        auto col_meta = std::make_shared<ColumnMeta>(
+            std::string(name), std::make_shared<Double>(),
+            std::make_shared<LSMTree>(table_path / name, table_number,
+                                      buffer_pool_manager,
+                                      std::make_shared<Double>()));
+        columns_.push_back(col_meta);
         name_map_column_idx_.emplace(name, idx++);
       }
     }
@@ -88,8 +92,8 @@ public:
       writer.String(column->name_.c_str());
       writer.Key("type");
       writer.String(column->type_->ToString().c_str());
-      writer.Key("page_number");
-      writer.String(std::to_string(column->page_number_).c_str());
+      writer.Key("table_number");
+      writer.String(std::to_string(column->lsm_tree_->GetTableNum()).c_str());
       writer.EndObject();
     }
 

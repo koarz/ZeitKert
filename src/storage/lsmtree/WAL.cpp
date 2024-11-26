@@ -7,19 +7,6 @@
 #include <tuple>
 
 namespace DB {
-Status WAL::ParseSliceToEntry(const Slice &key, const Slice &value,
-                              char *buffer) {
-  auto klen = key.Size();
-  auto vlen = value.Size();
-  char *p = buffer;
-  p = EncodeUInt32(p, klen);
-  std::memcpy(p, key.GetData(), klen);
-  p += klen;
-  p = EncodeUInt32(p, vlen);
-  std::memcpy(p, value.GetData(), vlen);
-  return Status::OK();
-}
-
 Status WAL::WriteSlice(const Slice &key, const Slice &value) {
   if (!write_log_) {
     return Status::OK();

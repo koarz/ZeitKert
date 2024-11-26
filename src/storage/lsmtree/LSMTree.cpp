@@ -7,6 +7,7 @@
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SkipList.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "storage/lsmtree/TableOperator.hpp"
 #include "storage/lsmtree/iterator/MemTableIterator.hpp"
 #include "storage/lsmtree/iterator/MergeIterator.hpp"
 
@@ -34,11 +35,21 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   auto size = memtable_->GetApproximateSize();
   if (size >= SSTABLE_SIZE) {
     std::unique_lock lock(immutable_latch_);
+    memtable_->ToImmutable();
     immutable_table_.push_back(std::move(memtable_));
-    memtable_ = std::make_unique<MemTable>(column_path_, write_log_);
-    // start checkpoint check
+    // start TableOperator check
     // when wal file size >= 4MB start cpmpaction
     // 4MB / 32KB = 128 so if immutable num = 128 start it
+    if (immutable_table_.size() == 128) {
+      // TODO: build sstable become async operate with write new memtable
+      // maybe we can insert new data first?
+      auto s = TableOperator::BuildSSTable(column_path_, table_number_,
+                                           immutable_table_);
+      if (!s.ok()) {
+        return s;
+      }
+    }
+    memtable_ = std::make_unique<MemTable>(column_path_, write_log_);
   }
   return memtable_->Put(key, value);
 }

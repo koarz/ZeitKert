@@ -9,7 +9,7 @@
 
 namespace DB {
 class Slice {
-  Byte *data_;
+  Byte *data_{};
   uint16_t size_;
 
 public:

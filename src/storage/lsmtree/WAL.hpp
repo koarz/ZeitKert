@@ -22,15 +22,17 @@ class WAL {
   // the fs for write file
   std::fstream fs_;
 
-  Status ParseSliceToEntry(const Slice &key, const Slice &value, char *buffer);
-
 public:
   WAL() = default;
-  WAL(std::filesystem::path path, bool write_log)
+  WAL(std::filesystem::path path, bool write_log, bool rewrite = false)
       : path_(path.concat(".wal")), write_log_(write_log) {
     if (write_log) {
-      // first start only read when read eof the fs will close(maybe)
-      fs_.open(path_, std::ios::binary | std::ios_base::in);
+      if (rewrite) {
+        fs_.open(path_, std::ios::trunc);
+      } else {
+        // first start only read when read eof the fs will close(maybe)
+        fs_.open(path_, std::ios::binary | std::ios_base::in);
+      }
     }
   }
 
@@ -39,6 +41,8 @@ public:
   void StartWriteLog() { write_log_ = true; }
 
   void StopWriteLog() { write_log_ = false; }
+
+  void Finish() { fs_.close(); }
 
   Status WriteSlice(const Slice &key, const Slice &value);
 

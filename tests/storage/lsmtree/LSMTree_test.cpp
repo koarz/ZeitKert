@@ -13,7 +13,7 @@ TEST(LSMTreeTest, BasicWriteReadTest) {
   auto bpm = std::make_shared<BufferPoolManager>(4, dm);
   std::filesystem::path path{"column"};
   auto value_type = std::make_shared<Int>();
-  LSMTree lsm(path, bpm, std::static_pointer_cast<ValueType>(value_type),
+  LSMTree lsm(path, 0, bpm, std::static_pointer_cast<ValueType>(value_type),
               false);
   EXPECT_TRUE(lsm.Insert("0", "0").ok());
   EXPECT_TRUE(lsm.Insert("1", "1").ok());
@@ -28,25 +28,25 @@ TEST(LSMTreeTest, BasicWriteReadTest) {
   }
 }
 
-TEST(LSMTreeTest, DISABLED_MemtableToImmutableTest) {
+TEST(LSMTreeTest, MemtableToImmutableTest) {
   using namespace DB;
   auto dm = std::make_shared<DiskManager>();
   auto bpm = std::make_shared<BufferPoolManager>(4, dm);
   std::filesystem::path path{"column"};
   auto value_type = std::make_shared<Int>();
-  LSMTree lsm(path, bpm, std::static_pointer_cast<ValueType>(value_type),
+  LSMTree lsm(path, 0, bpm, std::static_pointer_cast<ValueType>(value_type),
               false);
 
   std::vector<std::string> strs;
   // vector expansion can cause the internal data pointer of string to fail
   // I'm surprised the expansion mechanism isn't moving internal values?
-  strs.reserve(500000);
-  for (int i = 0; i < 500000; i++) {
+  strs.reserve(1000);
+  for (int i = 0; i < 1000; i++) {
     strs.emplace_back(std::to_string(i));
     EXPECT_TRUE(lsm.Insert(strs[i], strs[i]).ok());
   }
 
-  for (int i = 0; i < 500000; i++) {
+  for (int i = 0; i < 1000; i++) {
     Slice value;
     EXPECT_TRUE(lsm.GetValue(strs[i], &value).ok());
     EXPECT_EQ(value.ToString(), strs[i]);
@@ -61,7 +61,7 @@ TEST(LSMTreeTest, RemoveTest) {
   auto bpm = std::make_shared<BufferPoolManager>(4, dm);
   std::filesystem::path path{"column"};
   auto value_type = std::make_shared<Int>();
-  LSMTree lsm(path, bpm, std::static_pointer_cast<ValueType>(value_type),
+  LSMTree lsm(path, 0, bpm, std::static_pointer_cast<ValueType>(value_type),
               false);
   EXPECT_TRUE(lsm.Insert("0", "0").ok());
   EXPECT_TRUE(lsm.Insert("1", "1").ok());

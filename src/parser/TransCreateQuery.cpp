@@ -45,10 +45,10 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
         }
       }
       columns.emplace_back(std::make_shared<ColumnMeta>(
-          col_name, type, 0,
+          col_name, type,
           std::make_shared<LSMTree>(context->disk_manager_->GetPath() / name /
                                         col_name,
-                                    context->buffer_pool_manager_, type)));
+                                    0, context->buffer_pool_manager_, type)));
     }
   }
   return std::make_shared<CreateStatement>(type, name, columns);

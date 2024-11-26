@@ -30,6 +30,8 @@ public:
     RecoverFromWal();
   }
 
+  void ToImmutable() { wal_.Finish(); }
+
   // the function serilize all skiplist's data to string
   // and write them to immutable page
   std::string Serilize();
