@@ -32,26 +32,22 @@ public:
   }
 
   [[nodiscard]] bool Add(Slice &key, Slice &value) {
-    uint32_t offset = offsets_.empty() ? 0 : *offsets_.rbegin();
     if (blocks_.size() > SSTABLE_SIZE / DEFAULT_PAGE_SIZE) {
       return false;
     }
     auto &block = *blocks_.rbegin();
     auto t = block.Add(key, value);
     if (t == -1) {
-      offset = (offset / DEFAULT_PAGE_SIZE + 1) * DEFAULT_PAGE_SIZE;
       blocks_.emplace_back(BlockBuilder{});
       auto &block = *blocks_.rbegin();
       t = block.Add(key, value);
     }
-    offset += t;
-    offsets_.push_back(offset);
+    offsets_.push_back(t + (blocks_.size() - 1) * DEFAULT_PAGE_SIZE);
     return true;
   }
 
   Status Finish() {
     // start write file
-    blocks_.pop_back();
     std::ofstream fs;
     fs.open(path_, std::ios::trunc | std::ios::binary | std::ios::out);
     int i = 0;

@@ -38,7 +38,7 @@ inline Status ParseEntryToSlice(Slice &key, Slice &value, char *buffer) {
   p = DecodeUint32(p, klen);
   key = Slice{p, static_cast<uint16_t>(klen)};
   p += klen;
-  p = DecodeUint32(p, klen);
+  p = DecodeUint32(p, vlen);
   value = Slice{p, static_cast<uint16_t>(vlen)};
   return Status::OK();
 }
