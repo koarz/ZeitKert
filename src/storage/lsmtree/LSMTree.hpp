@@ -6,12 +6,12 @@
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SSTable.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "storage/lsmtree/TableOperator.hpp"
 #include "type/ValueType.hpp"
 
 #include <cstddef>
 #include <memory>
 #include <shared_mutex>
-#include <unordered_map>
 #include <vector>
 
 namespace DB {
@@ -26,12 +26,7 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   // the immutable table may reading by other threads
   // so we need safely delete them when immutable was full
   std::vector<MemTableRef> immutable_table_;
-  // level and pages mapping
-  std::unordered_map<uint32_t, std::vector<uint32_t>> levels_;
-  // page id
   std::map<uint32_t, SSTableRef> sstables_;
-
-  void ReadSSTableMeta();
 
 public:
   LSMTree(std::filesystem::path column_path, uint32_t table_number,
@@ -40,7 +35,13 @@ public:
       : IndexEngine(SliceCompare{}, std::move(column_path),
                     std::move(buffer_pool_manager), std::move(value_type)),
         table_number_(table_number), write_log_(write_log),
-        memtable_(std::make_unique<MemTable>(column_path_, write_log)) {}
+        memtable_(std::make_unique<MemTable>(column_path_, write_log)) {
+    for (int i = 0; i < table_number; i++) {
+      auto &table_meta = sstables_[i] = std::make_shared<SSTable>();
+      table_meta->sstable_id_ = i;
+      std::ignore = TableOperator::ReadSSTable(column_path_, table_meta);
+    }
+  }
 
   ~LSMTree() override = default;
 

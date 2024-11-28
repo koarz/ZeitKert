@@ -28,9 +28,10 @@ TEST(SSTableIteratorTest, BasicTest) {
   auto bpm = std::make_shared<BufferPoolManager>(128, dm);
   SSTableIterator iter(path, sstable_meta->offsets_, bpm);
   SliceCompare cmp;
-  int i{};
-  while (iter.Valid()) {
-    EXPECT_TRUE(cmp(iter.GetKey(), Slice{strs[i++]}) == 0);
+  for (int i = 0; i < 400; i++) {
+    EXPECT_TRUE(iter.Valid());
+    EXPECT_TRUE(cmp(iter.GetKey(), Slice{strs[i]}) == 0);
     iter.Next();
   }
+  EXPECT_FALSE(iter.Valid());
 }

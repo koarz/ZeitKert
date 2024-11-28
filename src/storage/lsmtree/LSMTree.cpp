@@ -1,6 +1,7 @@
 #include "storage/lsmtree/LSMTree.hpp"
 #include "common/Config.hpp"
 #include "common/Status.hpp"
+#include "fmt/format.h"
 #include "storage/column/Column.hpp"
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
@@ -10,6 +11,7 @@
 #include "storage/lsmtree/TableOperator.hpp"
 #include "storage/lsmtree/iterator/MemTableIterator.hpp"
 #include "storage/lsmtree/iterator/MergeIterator.hpp"
+#include "storage/lsmtree/iterator/SSTableIterator.hpp"
 
 #include <memory>
 #include <mutex>
@@ -17,8 +19,6 @@
 #include <string>
 
 namespace DB {
-void LSMTree::ReadSSTableMeta() {}
-
 Status LSMTree::Insert(const Slice &key, const Slice &value) {
   if (value.Size() > 0x4000) {
     // make life easy
@@ -31,25 +31,29 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
         ErrorCode::InsertError,
         "Your data too large, please split it to less than 16384 bytes");
   }
+  bool recover{};
   std::unique_lock lock(latch_);
   auto size = memtable_->GetApproximateSize();
-  if (size >= SSTABLE_SIZE) {
+  if (size >= DEFAULT_PAGE_SIZE) {
     std::unique_lock lock(immutable_latch_);
     memtable_->ToImmutable();
     immutable_table_.push_back(std::move(memtable_));
     // start TableOperator check
     // when wal file size >= 4MB start cpmpaction
     // 4MB / 32KB = 128 so if immutable num = 128 start it
-    if (immutable_table_.size() == 128) {
+    if (immutable_table_.size() == SSTABLE_SIZE / DEFAULT_PAGE_SIZE) {
       // TODO: build sstable become async operate with write new memtable
       // maybe we can insert new data first?
       auto s = TableOperator::BuildSSTable(column_path_, table_number_,
-                                           immutable_table_);
+                                           immutable_table_,
+                                           sstables_[table_number_]);
       if (!s.ok()) {
         return s;
       }
+      recover = true;
+      immutable_table_.clear();
     }
-    memtable_ = std::make_unique<MemTable>(column_path_, write_log_);
+    memtable_ = std::make_unique<MemTable>(column_path_, write_log_, recover);
   }
   return memtable_->Put(key, value);
 }
@@ -96,6 +100,11 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
        it++) {
     iters.push_back(
         std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
+  }
+  for (int i = 0; i < table_number_; i++) {
+    auto path = column_path_ / fmt::format("{}.sst", i);
+    iters.push_back(std::make_shared<SSTableIterator>(
+        path, sstables_[i]->offsets_, buffer_pool_manager_));
   }
   MergeIterator it(std::move(iters));
   switch (value_type_->GetType()) {

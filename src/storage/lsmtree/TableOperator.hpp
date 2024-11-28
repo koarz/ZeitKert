@@ -12,7 +12,8 @@ struct TableOperator {
   TableOperator() = delete;
 
   static Status BuildSSTable(std::filesystem::path path, uint32_t &table_id,
-                             std::vector<MemTableRef> &memtables);
+                             std::vector<MemTableRef> &memtables,
+                             SSTableRef &sstable_meta);
 
   static Status StartCompaction(std::vector<SSTableRef> tables);
 

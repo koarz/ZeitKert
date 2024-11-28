@@ -44,8 +44,20 @@ Status ZeitKert::HandleCreateStatement() {
       return Status::Error(ErrorCode::NotChoiceDatabase,
                            "You have not choice a database");
     }
-    return context_->database_->CreateTable(name,
-                                            create_Statement.GetColumns());
+    auto s =
+        context_->database_->CreateTable(name, create_Statement.GetColumns());
+    if (!s.ok()) {
+      return s;
+    }
+    auto table_meta = context_->database_->GetTableMeta(name);
+
+    for (auto &c : table_meta->GetColumns()) {
+      auto col_path = context_->database_->GetPath() / name / c->name_;
+      std::filesystem::create_directory(col_path);
+      c->lsm_tree_ = std::make_shared<LSMTree>(
+          col_path, 0, context_->buffer_pool_manager_, c->type_);
+    }
+    return s;
   } else {
     return context_->disk_manager_->CreateDatabase(name);
   }

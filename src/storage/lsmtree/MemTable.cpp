@@ -36,6 +36,6 @@ std::string MemTable::Serilize() {
     ++it;
   }
   assert(res.size() <= DEFAULT_PAGE_SIZE);
-  return std::move(res);
+  return res;
 }
 } // namespace DB

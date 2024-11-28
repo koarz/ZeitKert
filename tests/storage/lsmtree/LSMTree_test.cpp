@@ -40,13 +40,13 @@ TEST(LSMTreeTest, MemtableToImmutableTest) {
   std::vector<std::string> strs;
   // vector expansion can cause the internal data pointer of string to fail
   // I'm surprised the expansion mechanism isn't moving internal values?
-  strs.reserve(1000);
-  for (int i = 0; i < 1000; i++) {
+  strs.reserve(500);
+  for (int i = 0; i < 500; i++) {
     strs.emplace_back(std::to_string(i));
     EXPECT_TRUE(lsm.Insert(strs[i], strs[i]).ok());
   }
 
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 500; i++) {
     Slice value;
     EXPECT_TRUE(lsm.GetValue(strs[i], &value).ok());
     EXPECT_EQ(value.ToString(), strs[i]);

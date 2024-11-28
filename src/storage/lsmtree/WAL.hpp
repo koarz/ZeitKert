@@ -28,10 +28,12 @@ public:
       : path_(path.concat(".wal")), write_log_(write_log) {
     if (write_log) {
       if (rewrite) {
-        fs_.open(path_, std::ios::trunc);
+        fs_.open(path_, std::ios_base::out);
+        fs_.close();
       } else {
         // first start only read when read eof the fs will close(maybe)
-        fs_.open(path_, std::ios::binary | std::ios_base::in);
+        fs_.open(path_, std::ios::binary | std::ios_base::in |
+                            std::ios_base::out | std::ios::app);
       }
     }
   }

@@ -44,11 +44,8 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
           return nullptr;
         }
       }
-      columns.emplace_back(std::make_shared<ColumnMeta>(
-          col_name, type,
-          std::make_shared<LSMTree>(context->disk_manager_->GetPath() / name /
-                                        col_name,
-                                    0, context->buffer_pool_manager_, type)));
+      columns.emplace_back(
+          std::make_shared<ColumnMeta>(col_name, type, nullptr));
     }
   }
   return std::make_shared<CreateStatement>(type, name, columns);

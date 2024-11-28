@@ -47,6 +47,9 @@ public:
   }
 
   Status Finish() {
+    if (blocks_.rbegin()->IsEmpty()) {
+      blocks_.pop_back();
+    }
     // start write file
     std::ofstream fs;
     fs.open(path_, std::ios::trunc | std::ios::binary | std::ios::out);

@@ -13,7 +13,8 @@
 namespace DB {
 Status TableOperator::BuildSSTable(std::filesystem::path path,
                                    uint32_t &table_id,
-                                   std::vector<MemTableRef> &memtables) {
+                                   std::vector<MemTableRef> &memtables,
+                                   SSTableRef &sstable_meta) {
   SSTableBuilder builder(path, table_id);
   std::vector<std::shared_ptr<Iterator>> iters;
   for (auto it = memtables.rbegin(); it != memtables.rend(); it++) {
@@ -23,24 +24,23 @@ Status TableOperator::BuildSSTable(std::filesystem::path path,
   MergeIterator iter(std::move(iters));
   while (iter.Valid()) {
     if (builder.Add(iter.GetKey(), iter.GetValue()) == false) {
-      auto s = builder.Finish();
-      if (!s.ok()) {
-        return s;
-      }
-      // write other data to wal file
-      // use rewrite flag for open a new file
-      WAL wal(path, true, true);
-      while (iter.Valid()) {
-        s = wal.WriteSlice(iter.GetKey(), iter.GetValue());
-        if (!s.ok()) {
-          return s;
-        }
-        iter.Next();
-      }
+      break;
     }
     iter.Next();
   }
+  // write other data to wal file
+  // use rewrite flag for open a new file
+  WAL wal(path, true, true);
+  while (iter.Valid()) {
+    auto s = wal.WriteSlice(iter.GetKey(), iter.GetValue());
+    if (!s.ok()) {
+      return s;
+    }
+    iter.Next();
+  }
+  table_id++;
   auto s = builder.Finish();
+  sstable_meta = builder.BuildSSTableMeta();
   return s;
 }
 
@@ -64,6 +64,7 @@ Status TableOperator::ReadSSTable(std::filesystem::path path,
   for (int i = 0; i < offset_num; i++) {
     uint32_t offset;
     fs.read(reinterpret_cast<char *>(&offset), 4);
+    sstable_meta->offsets_.push_back(offset);
   }
   fs.seekg(sstable_meta->num_of_blocks_ * DEFAULT_PAGE_SIZE);
   // read index

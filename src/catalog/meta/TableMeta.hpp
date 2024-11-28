@@ -42,7 +42,7 @@ public:
       auto name = column["name"].get_string().value();
       auto type = column["type"].get_string().value();
       auto table_number =
-          std::stoull(std::string(column["table_number"].get_string().value()));
+          std::stoul(std::string(column["table_number"].get_string().value()));
       // auto nullable = column["nullable"].get_bool();
       if (type == "int") {
         columns_.push_back(std::make_shared<ColumnMeta>(
@@ -93,7 +93,11 @@ public:
       writer.Key("type");
       writer.String(column->type_->ToString().c_str());
       writer.Key("table_number");
-      writer.String(std::to_string(column->lsm_tree_->GetTableNum()).c_str());
+      if (column->lsm_tree_ == nullptr) {
+        writer.String("0");
+      } else {
+        writer.String(std::to_string(column->lsm_tree_->GetTableNum()).c_str());
+      }
       writer.EndObject();
     }
 

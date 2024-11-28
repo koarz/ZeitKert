@@ -26,6 +26,8 @@ public:
     return buf_.size() - size;
   }
 
+  bool IsEmpty() { return buf_.empty(); }
+
   std::string &GetData() { return buf_; }
 
   Slice &GetLastKey() { return last_key_; }

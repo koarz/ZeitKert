@@ -19,15 +19,17 @@ constexpr size_t DEFAULT_SKIP_LIST_LEVEL = 8;
 
 class MemTable {
   WAL wal_;
-  std::atomic_uint32_t approximate_size_;
+  std::atomic_uint32_t approximate_size_{};
   SkipList<Slice, Slice, SliceCompare> skip_list_;
 
 public:
   MemTable() : skip_list_(DEFAULT_SKIP_LIST_LEVEL, SliceCompare{}) {}
-  MemTable(std::filesystem::path path, bool write_log)
+  MemTable(std::filesystem::path path, bool write_log, bool recover = true)
       : wal_(path, write_log),
         skip_list_(DEFAULT_SKIP_LIST_LEVEL, SliceCompare{}) {
-    RecoverFromWal();
+    if (recover) {
+      RecoverFromWal();
+    }
   }
 
   void ToImmutable() { wal_.Finish(); }
