@@ -94,14 +94,18 @@ Status LSMTree::ScanColumn(ColumnPtr &res) {
   std::shared_lock lock1(latch_), lock2(immutable_latch_);
   std::vector<std::shared_ptr<Iterator>> iters;
   SkipList<Slice, Slice, SliceCompare> temp_list{8, SliceCompare{}};
-  iters.push_back(
-      std::make_shared<MemTableIterator>(memtable_->MakeNewIterator()));
+  {
+    auto ite = std::make_shared<MemTableIterator>(memtable_->MakeNewIterator());
+    if (ite->Valid())
+      iters.push_back(ite);
+    {}
+  }
   for (auto it = immutable_table_.rbegin(); it != immutable_table_.rend();
        it++) {
     iters.push_back(
         std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
   }
-  for (int i = 0; i < table_number_; i++) {
+  for (int i = table_number_ - 1; i >= 0; i--) {
     auto path = column_path_ / fmt::format("{}.sst", i);
     iters.push_back(std::make_shared<SSTableIterator>(
         path, sstables_[i]->offsets_, buffer_pool_manager_));

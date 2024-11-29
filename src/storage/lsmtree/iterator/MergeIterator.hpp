@@ -16,7 +16,7 @@ public:
       : iters_(std::move(iters)) {
     current_ = iters_[0];
     for (auto &it : iters_) {
-      if (current_ == it) {
+      if (!it->Valid() || current_ == it) {
         continue;
       }
 
@@ -24,7 +24,7 @@ public:
         it->Next();
       }
 
-      if (compare_(current_->GetKey(), it->GetKey()) > 0) {
+      if (!it->Valid() || compare_(current_->GetKey(), it->GetKey()) > 0) {
         current_ = it;
       }
     }

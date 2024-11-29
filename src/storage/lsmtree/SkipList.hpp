@@ -9,7 +9,7 @@
 namespace DB {
 template <typename Key, typename Value> struct SkipListNode {
   std::vector<std::shared_ptr<SkipListNode>> next_;
-  std::pair<Key, Value> kv_;
+  std::pair<Key, Value> kv_{};
   SkipListNode(uint32_t level) : next_(level, nullptr) {}
 };
 
