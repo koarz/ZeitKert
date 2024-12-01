@@ -1,5 +1,5 @@
 # A list of pending task
-- [ ] SSTable Read Write
+- [x] SSTable Read Write
 - [ ] SSTable Compression
 - [ ] MVCC
 - [ ] SnapShot
@@ -11,7 +11,7 @@
 - [ ] Complete Select Query
 - [ ] Explain Query
 - [ ] Create Index
-- [ ] Optimizing Performance 
+- [ ] Optimizing Performance
 - [ ] Primary Key
 - [ ] Batch Insert
 - [ ] Multi-table Join Query
