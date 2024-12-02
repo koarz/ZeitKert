@@ -10,5 +10,8 @@ elif [ "${param}" = "bpm" ]; then
 elif [ "${param}" = "file" ]; then
     clang++ -std=c++23 -g -O3 ./benchmark/file-control-bench.cpp -o ./build/linux/x86_64/debug/file-control-bench
     ./build/linux/x86_64/debug/file-control-bench
+elif [ "${param}" = "test" ]; then
+    xmake build tests
+    xmake run tests
 fi
 done
