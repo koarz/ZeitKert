@@ -4,6 +4,7 @@ for param in "$@"; do
 if [ "${param}" = "help" ]; then
     echo "bpm     start buffer pool manager bench"
     echo "file    start file control bench"
+    echo "test    start all tests"
 elif [ "${param}" = "bpm" ]; then
     xmake build bpm-bench
     xmake run bpm-bench
