@@ -23,5 +23,5 @@ constexpr size_t DEFAULT_POOL_SIZE = 128;
 // per sstable size is 4MB
 constexpr uint32_t SSTABLE_SIZE = 0x400000;
 constexpr size_t DEFAULT_PAGE_SIZE = 32768;
-constexpr size_t DEFAULT_POOL_SIZE = 1024;
+constexpr size_t DEFAULT_POOL_SIZE = 2048;
 #endif
