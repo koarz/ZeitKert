@@ -8,6 +8,7 @@
 #include "common/ZeitKert.hpp"
 #include "common/util/StringUtil.hpp"
 #include "function/Abs.hpp"
+#include "function/FunctionCast.hpp"
 #include "function/FunctionString.hpp"
 #include "linenoise.h"
 #include "parser/Checker.hpp"
@@ -90,6 +91,7 @@ void CheckerRegister() {
   Checker::RegisterType("DOUBLE");
 
   Checker::RegisterFunction("ABS", std::make_shared<DB::FunctionAbs>());
+  Checker::RegisterFunction("CAST", std::make_shared<DB::FunctionCast>());
   Checker::RegisterFunction("TO_UPPER",
                             std::make_shared<DB::FunctionToUpper>());
   Checker::RegisterFunction("TO_LOWER",

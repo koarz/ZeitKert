@@ -25,7 +25,15 @@ Status FunctionExecutor::Execute() {
       result_idx++;
     }
   }
-  auto res_type = function_->GetResultType();
+  std::shared_ptr<ValueType> res_type;
+  status = function_->ResolveResultType(block, res_type);
+  if (!status.ok()) {
+    return status;
+  }
+  if (res_type == nullptr) {
+    return Status::Error(ErrorCode::BindError,
+                         "function result type cannot be null");
+  }
   ColumnPtr res_data;
   switch (res_type->GetType()) {
   case ValueType::Type::Int:
@@ -38,6 +46,7 @@ Status FunctionExecutor::Execute() {
     res_data = std::make_shared<ColumnString>();
     break;
   case ValueType::Type::Null:
+    return Status::Error(ErrorCode::BindError, "function result type invalid");
   }
   std::string func_name =
       function_->GetName() + "(" + block.GetColumn(0)->GetColumnName();

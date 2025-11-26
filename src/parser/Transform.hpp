@@ -55,7 +55,10 @@ private:
 
   static BoundExpressRef MakeNumericConstant(const Token &token,
                                              bool is_negative);
+
   static BoundExpressRef MakeStringConstant(const Token &token);
+
+  static BoundExpressRef MakeZeroConstant();
 
   static void AppendColumns(const TableMetaRef &table,
                             std::vector<BoundExpressRef> &columns);
@@ -87,5 +90,35 @@ private:
                                          std::vector<TableMetaRef> &tables,
                                          std::vector<BoundExpressRef> &columns,
                                          std::string &message);
+
+  static BoundExpressRef ParseExpression(TokenIterator &it, TokenIterator end,
+                                         std::vector<TableMetaRef> &tables,
+                                         std::vector<BoundExpressRef> &columns,
+                                         std::string &message,
+                                         int min_precedence = 0);
+
+  static BoundExpressRef ParseUnary(TokenIterator &it, TokenIterator end,
+                                    std::vector<TableMetaRef> &tables,
+                                    std::vector<BoundExpressRef> &columns,
+                                    std::string &message);
+
+  static BoundExpressRef ParsePrimary(TokenIterator &it, TokenIterator end,
+                                      std::vector<TableMetaRef> &tables,
+                                      std::vector<BoundExpressRef> &columns,
+                                      std::string &message);
+
+  static int GetBinaryPrecedence(TokenType type);
+
+  static BoundExpressRef CreateArithmeticFunction(TokenType op_type,
+                                                  BoundExpressRef lhs,
+                                                  BoundExpressRef rhs,
+                                                  std::string &message);
+
+  static std::shared_ptr<ValueType>
+  GetExpressType(const BoundExpressRef &express);
+
+  static std::shared_ptr<ValueType>
+  DeduceNumericType(const BoundExpressRef &lhs, const BoundExpressRef &rhs,
+                    std::string &message);
 };
 } // namespace DB

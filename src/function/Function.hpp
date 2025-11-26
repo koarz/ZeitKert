@@ -24,5 +24,12 @@ public:
 
   // before execute function we should construct new column push it to block
   virtual std::shared_ptr<ValueType> GetResultType() const = 0;
+
+  virtual Status
+  ResolveResultType(Block &block,
+                    std::shared_ptr<ValueType> &result_type) const {
+    result_type = GetResultType();
+    return Status::OK();
+  }
 };
 } // namespace DB
