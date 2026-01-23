@@ -71,6 +71,11 @@ Status ZeitKert::HandleDropStatement() {
     context_->database_->RemoveTable(name);
     break;
   case DropType::Database:
+    // 如果删除的是当前使用的数据库，清空context
+    if (context_->database_ != nullptr &&
+        context_->database_->GetPath().filename() == name) {
+      context_->database_ = nullptr;
+    }
     status = context_->disk_manager_->DropDatabase(name);
     break;
   }
@@ -95,7 +100,13 @@ Status ZeitKert::HandleCreateStatement() {
 
     for (auto &c : table_meta->GetColumns()) {
       auto col_path = context_->database_->GetPath() / name / c->name_;
-      std::filesystem::create_directory(col_path);
+      std::error_code ec;
+      std::filesystem::create_directory(col_path, ec);
+      if (ec) {
+        return Status::Error(ErrorCode::CreateError,
+                             "Failed to create column directory: " +
+                                 ec.message());
+      }
       c->lsm_tree_ = std::make_shared<LSMTree>(
           col_path, 0, context_->buffer_pool_manager_, c->type_);
     }
