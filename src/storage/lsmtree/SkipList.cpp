@@ -7,9 +7,9 @@
 namespace DB {
 SKIP_LIST_TEMPLATE_HEAD
 uint32_t SkipList<Key, Value, KeyCompare>::GetRandomLevel() {
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::geometric_distribution<> distrib;
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  static std::geometric_distribution<> distrib;
   // make sure not 0
   return distrib(gen) % max_level_ ?: 1;
 }
