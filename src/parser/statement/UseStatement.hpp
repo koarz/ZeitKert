@@ -10,7 +10,7 @@ class UseStatement : public SQLStatement {
 
 public:
   explicit UseStatement(std::string name)
-      : SQLStatement(StatementType::USE_STATEMENT), name_(std::move(name)) {}
+      : SQLStatement(StatementType::UseStatement), name_(std::move(name)) {}
 
   ~UseStatement() override = default;
 

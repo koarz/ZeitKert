@@ -21,9 +21,9 @@ Planner::Planner(std::shared_ptr<QueryContext> context) : context_(context) {}
 
 Status Planner::QueryPlan() {
   auto statement = context_->sql_statement_;
-  if (statement->type == StatementType::SELECT_STATEMENT) {
+  if (statement->type == StatementType::SelectStatement) {
     return PlanSelect(static_cast<SelectStatement &>(*statement));
-  } else if (statement->type == StatementType::INSERT_STATEMENT) {
+  } else if (statement->type == StatementType::InsertStatement) {
     return PlanInsert(static_cast<InsertStatement &>(*statement));
   }
   return Status::OK();

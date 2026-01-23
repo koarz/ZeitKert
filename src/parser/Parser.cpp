@@ -63,10 +63,10 @@ Status Parser::ParseCreate(TokenIterator &iterator) {
   if (Checker::IsKeyWord(str)) {
     if (str == "DATABASE") {
       tree_ = std::make_shared<CreateQuery>(
-          CreateType::DATABASE, std::string{iterator->begin, iterator->end});
+          CreateType::Database, std::string{iterator->begin, iterator->end});
     } else if (str == "TABLE") {
       tree_ = std::make_shared<CreateQuery>(
-          CreateType::TABLE, std::string{iterator->begin, iterator->end});
+          CreateType::Table, std::string{iterator->begin, iterator->end});
       if ((++iterator)->type != TokenType::OpeningRoundBracket) {
         return Status::Error(ErrorCode::SyntaxError,
                              "Your sql have syntax error");

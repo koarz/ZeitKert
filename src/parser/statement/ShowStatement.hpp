@@ -9,7 +9,7 @@ class ShowStatement : public SQLStatement {
 
 public:
   explicit ShowStatement(ShowType show_type)
-      : SQLStatement(StatementType::SHOW_STATEMENT), show_type_(show_type) {}
+      : SQLStatement(StatementType::ShowStatement), show_type_(show_type) {}
 
   ~ShowStatement() override = default;
 

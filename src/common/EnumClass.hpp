@@ -1,7 +1,7 @@
 #pragma once
 enum class CreateType {
-  DATABASE,
-  TABLE,
+  Database,
+  Table,
 };
 
 enum class ErrorCode {
@@ -21,13 +21,13 @@ enum class ErrorCode {
 };
 
 enum class StatementType {
-  INVALID_STATEMENT,
-  CREATE_STATEMENT,
-  USE_STATEMENT,
-  SHOW_STATEMENT,
-  SELECT_STATEMENT,
-  INSERT_STATEMENT,
-  DROP_STATEMENT,
+  InvalidStatement,
+  CreateStatement,
+  UseStatement,
+  ShowStatement,
+  SelectStatement,
+  InsertStatement,
+  DropStatement,
 };
 
 enum class ASTNodeType {

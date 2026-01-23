@@ -7,11 +7,11 @@ namespace DB {
 class CreateStatement : public SQLStatement {
 
 public:
-  static constexpr const StatementType TYPE = StatementType::CREATE_STATEMENT;
+  static constexpr const StatementType TYPE = StatementType::CreateStatement;
 
   explicit CreateStatement(CreateType &type, std::string &name,
                            std::vector<std::shared_ptr<ColumnMeta>> &columns)
-      : SQLStatement(StatementType::CREATE_STATEMENT), type_(type),
+      : SQLStatement(StatementType::CreateStatement), type_(type),
         name_(std::move(name)), columns_(std::move(columns)) {}
 
   ~CreateStatement() override = default;

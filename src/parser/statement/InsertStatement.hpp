@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog/meta/TableMeta.hpp"
+#include "common/EnumClass.hpp"
 #include "parser/SQLStatement.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/statement/SelectStatement.hpp"
@@ -10,7 +11,7 @@
 namespace DB {
 struct InsertStatement : public SQLStatement {
 
-  InsertStatement() : SQLStatement(StatementType::INSERT_STATEMENT) {}
+  InsertStatement() : SQLStatement(StatementType::InsertStatement) {}
 
   ~InsertStatement() override = default;
 

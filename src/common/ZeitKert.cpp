@@ -39,7 +39,7 @@ Status ZeitKert::HandleCreateStatement() {
   auto &create_Statement =
       static_cast<CreateStatement &>(*context_->sql_statement_);
   auto name = create_Statement.GetName();
-  if (create_Statement.GetCreateType() == CreateType::TABLE) {
+  if (create_Statement.GetCreateType() == CreateType::Table) {
     if (context_->database_ == nullptr) {
       return Status::Error(ErrorCode::NotChoiceDatabase,
                            "You have not choice a database");

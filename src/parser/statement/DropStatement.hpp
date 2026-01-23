@@ -12,7 +12,7 @@ class DropStatement : public SQLStatement {
 
 public:
   DropStatement(DropType type, std::string name)
-      : SQLStatement(StatementType::DROP_STATEMENT), type_(type),
+      : SQLStatement(StatementType::DropStatement), type_(type),
         name_(std::move(name)) {}
   ~DropStatement() override = default;
 

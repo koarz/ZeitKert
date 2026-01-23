@@ -1,13 +1,14 @@
 #pragma once
 
 #include "catalog/meta/TableMeta.hpp"
+#include "common/EnumClass.hpp"
 #include "parser/SQLStatement.hpp"
 #include "parser/binder/BoundExpress.hpp"
 
 namespace DB {
 struct SelectStatement : public SQLStatement {
 
-  SelectStatement() : SQLStatement(StatementType::SELECT_STATEMENT) {}
+  SelectStatement() : SQLStatement(StatementType::SelectStatement) {}
 
   ~SelectStatement() override = default;
 

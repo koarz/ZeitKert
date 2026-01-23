@@ -11,7 +11,7 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
   auto name = create_query.GetName();
   auto type = create_query.GetType();
   std::vector<ColumnMetaRef> columns;
-  if (type == CreateType::TABLE) {
+  if (type == CreateType::Table) {
     auto &node_query = static_cast<ASTToken &>(*create_query.children_[0]);
     auto it = node_query.Begin();
     while (it->type != TokenType::ClosingRoundBracket) {

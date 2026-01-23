@@ -42,21 +42,21 @@ public:
     auto stmt = binder.GetStatement();
     context_->sql_statement_ = stmt;
     switch (stmt->type) {
-    case StatementType::CREATE_STATEMENT:
+    case StatementType::CreateStatement:
       status = HandleCreateStatement();
       goto ExecuteEnd;
-    case StatementType::USE_STATEMENT:
+    case StatementType::UseStatement:
       status = HandleUseStatement();
       goto ExecuteEnd;
-    case StatementType::SHOW_STATEMENT:
+    case StatementType::ShowStatement:
       status = HandleShowStatement(result_set);
       goto ExecuteEnd;
-    case StatementType::DROP_STATEMENT:
+    case StatementType::DropStatement:
       status = HandleDropStatement();
       goto ExecuteEnd;
-    case StatementType::INVALID_STATEMENT:
-    case StatementType::SELECT_STATEMENT:
-    case StatementType::INSERT_STATEMENT: break;
+    case StatementType::InvalidStatement:
+    case StatementType::SelectStatement:
+    case StatementType::InsertStatement: break;
     }
 
     status = planner.QueryPlan();
