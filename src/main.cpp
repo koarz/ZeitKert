@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "common/Logger.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "common/ZeitKert.hpp"
@@ -16,6 +17,8 @@
 void CheckerRegister();
 
 int main(int argc, char *argv[]) {
+  DB::Logger::Init("./logs/zeitkert.log");
+
   CheckerRegister();
   DB::ZeitKert db;
   int num{};
@@ -65,6 +68,7 @@ int main(int argc, char *argv[]) {
   }
 
   std::cout << "Bye.\n";
+  DB::Logger::Shutdown();
   return 0;
 }
 
@@ -84,6 +88,8 @@ void CheckerRegister() {
   Checker::RegisterKeyWord("INTO");
   Checker::RegisterKeyWord("VALUES");
   Checker::RegisterKeyWord("FROM");
+  Checker::RegisterKeyWord("UNIQUE");
+  Checker::RegisterKeyWord("KEY");
 
   Checker::RegisterType("INT");
   // Checker::RegisterType("Varchar");

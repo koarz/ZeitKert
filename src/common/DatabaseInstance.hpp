@@ -36,7 +36,8 @@ public:
   }
 
   Status CreateTable(std::string &table_name,
-                     std::vector<std::shared_ptr<ColumnMeta>> &columns);
+                     std::vector<std::shared_ptr<ColumnMeta>> &columns,
+                     std::string unique_key = "");
 
   Status ShowTables(ResultSet &result_set);
 

@@ -11,6 +11,7 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
   auto name = create_query.GetName();
   auto type = create_query.GetType();
   std::vector<ColumnMetaRef> columns;
+  std::string unique_key;
   if (type == CreateType::Table) {
     auto &node_query = static_cast<ASTToken &>(*create_query.children_[0]);
     auto it = node_query.Begin();
@@ -47,8 +48,32 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
       columns.emplace_back(
           std::make_shared<ColumnMeta>(col_name, type, nullptr));
     }
+
+    // 解析 UNIQUE KEY 子句
+    if (create_query.children_.size() > 1) {
+      auto &uk_node = static_cast<ASTToken &>(*create_query.children_[1]);
+      auto uk_it = uk_node.Begin();
+      if (uk_it->type == TokenType::BareWord) {
+        unique_key = std::string{uk_it->begin, uk_it->end};
+      }
+    }
+
+    if (!unique_key.empty()) {
+      bool found = false;
+      for (const auto &col : columns) {
+        if (col->name_ == unique_key) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        message =
+            "UNIQUE KEY column '" + unique_key + "' not found in table columns";
+        return nullptr;
+      }
+    }
   }
-  return std::make_shared<CreateStatement>(type, name, columns);
+  return std::make_shared<CreateStatement>(type, name, columns, unique_key);
 }
 
 } // namespace DB

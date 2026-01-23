@@ -21,11 +21,12 @@ Database::Database(std::filesystem::path path,
   }
 }
 
-Status
-Database::CreateTable(std::string &table_name,
-                      std::vector<std::shared_ptr<ColumnMeta>> &columns) {
+Status Database::CreateTable(std::string &table_name,
+                             std::vector<std::shared_ptr<ColumnMeta>> &columns,
+                             std::string unique_key) {
   table_metas_.emplace(
-      table_name, std::make_shared<TableMeta>(table_name, std::move(columns)));
+      table_name, std::make_shared<TableMeta>(table_name, std::move(columns),
+                                              std::move(unique_key)));
   return disk_manager_->CreateTable(path_ / table_name,
                                     table_metas_.rbegin()->second->Serialize());
 }

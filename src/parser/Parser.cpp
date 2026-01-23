@@ -76,6 +76,37 @@ Status Parser::ParseCreate(TokenIterator &iterator) {
         ;
       std::optional<TokenIterator> end{iterator};
       tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
+
+      // 解析括号后的 UNIQUE KEY 子句
+      auto next = iterator;
+      ++next;
+      if (!next->isEnd() && next->type == TokenType::BareWord) {
+        std::string keyword{next->begin, next->end};
+        if (Checker::IsKeyWord(keyword) && keyword == "UNIQUE") {
+          auto key_token = next;
+          ++key_token;
+          if (key_token->type == TokenType::BareWord) {
+            std::string key_word{key_token->begin, key_token->end};
+            if (Checker::IsKeyWord(key_word) && key_word == "KEY") {
+              // 跳到 (
+              auto paren = key_token;
+              ++paren;
+              if (paren->type == TokenType::OpeningRoundBracket) {
+                // 跳到列名
+                auto col_name = paren;
+                ++col_name;
+                if (col_name->type == TokenType::BareWord) {
+                  // 只保存列名到 children_[1]
+                  std::optional<TokenIterator> uk_begin{col_name};
+                  std::optional<TokenIterator> uk_end{col_name};
+                  tree_->children_.emplace_back(
+                      std::make_shared<ASTToken>(uk_begin, uk_end));
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
   return Status::OK();

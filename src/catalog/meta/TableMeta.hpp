@@ -22,8 +22,8 @@ class TableMeta {
   std::string table_name_;
   atomic_uint32_t row_number_;
   std::vector<ColumnMetaRef> columns_;
-  // primary_key
   std::map<std::string, uint> name_map_column_idx_;
+  std::string unique_key_column_name_;
 
 public:
   static constexpr std::string default_table_meta_name = "table_meta.json";
@@ -68,10 +68,16 @@ public:
         name_map_column_idx_.emplace(name, idx++);
       }
     }
+    if (json.at_key("unique_key").error() == simdjson::SUCCESS) {
+      unique_key_column_name_ =
+          std::string(json["unique_key"].get_string().value());
+    }
   }
 
-  explicit TableMeta(std::string table_name, std::vector<ColumnMetaRef> columns)
-      : table_name_(std::move(table_name)), columns_(std::move(columns)) {}
+  explicit TableMeta(std::string table_name, std::vector<ColumnMetaRef> columns,
+                     std::string unique_key = "")
+      : table_name_(std::move(table_name)), columns_(std::move(columns)),
+        unique_key_column_name_(std::move(unique_key)) {}
 
   std::string Serialize() {
     rapidjson::StringBuffer buffer;
@@ -102,6 +108,10 @@ public:
     }
 
     writer.EndArray();
+
+    writer.Key("unique_key");
+    writer.String(unique_key_column_name_.c_str());
+
     writer.EndObject();
 
     return buffer.GetString();
@@ -116,6 +126,14 @@ public:
   std::string GetTableName() { return table_name_; }
 
   atomic_uint32_t &GetRowNumber() { return row_number_; }
+
+  std::string GetUniqueKeyColumn() { return unique_key_column_name_; }
+
+  void SetUniqueKeyColumn(const std::string &col_name) {
+    unique_key_column_name_ = col_name;
+  }
+
+  bool HasUniqueKey() { return !unique_key_column_name_.empty(); }
 };
 
 using TableMetaRef = std::shared_ptr<TableMeta>;

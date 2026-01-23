@@ -36,16 +36,16 @@ Status ZeitKert::HandleDropStatement() {
 }
 
 Status ZeitKert::HandleCreateStatement() {
-  auto &create_Statement =
+  auto &create_statement =
       static_cast<CreateStatement &>(*context_->sql_statement_);
-  auto name = create_Statement.GetName();
-  if (create_Statement.GetCreateType() == CreateType::Table) {
+  auto name = create_statement.GetName();
+  if (create_statement.GetCreateType() == CreateType::Table) {
     if (context_->database_ == nullptr) {
       return Status::Error(ErrorCode::NotChoiceDatabase,
                            "You have not choice a database");
     }
-    auto s =
-        context_->database_->CreateTable(name, create_Statement.GetColumns());
+    auto s = context_->database_->CreateTable(
+        name, create_statement.GetColumns(), create_statement.GetUniqueKey());
     if (!s.ok()) {
       return s;
     }
@@ -64,8 +64,8 @@ Status ZeitKert::HandleCreateStatement() {
 }
 
 Status ZeitKert::HandleUseStatement() {
-  auto &use_Statement = static_cast<UseStatement &>(*context_->sql_statement_);
-  auto name = use_Statement.GetName();
+  auto &use_statement = static_cast<UseStatement &>(*context_->sql_statement_);
+  auto name = use_statement.GetName();
   auto disk_manager = context_->disk_manager_;
   auto status = disk_manager->OpenDatabase(name);
   if (status.ok()) {
@@ -77,9 +77,9 @@ Status ZeitKert::HandleUseStatement() {
 }
 
 Status ZeitKert::HandleShowStatement(ResultSet &result_set) {
-  auto &show_Statement =
+  auto &show_statement =
       static_cast<ShowStatement &>(*context_->sql_statement_);
-  auto show_type = show_Statement.GetShowType();
+  auto show_type = show_statement.GetShowType();
   Status status;
   switch (show_type) {
   case ShowType::Databases:
