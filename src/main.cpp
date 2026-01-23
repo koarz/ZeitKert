@@ -8,18 +8,11 @@
 #include "common/Status.hpp"
 #include "common/ZeitKert.hpp"
 #include "common/util/StringUtil.hpp"
-#include "function/Abs.hpp"
-#include "function/FunctionCast.hpp"
-#include "function/FunctionString.hpp"
 #include "linenoise.h"
-#include "parser/Checker.hpp"
-
-void CheckerRegister();
 
 int main(int argc, char *argv[]) {
   DB::Logger::Init("./logs/zeitkert.log");
 
-  CheckerRegister();
   DB::ZeitKert db;
   int num{};
 
@@ -70,36 +63,4 @@ int main(int argc, char *argv[]) {
   std::cout << "Bye.\n";
   DB::Logger::Shutdown();
   return 0;
-}
-
-void CheckerRegister() {
-  using Checker = DB::Checker;
-  Checker::RegisterKeyWord("CREATE");
-  Checker::RegisterKeyWord("DROP");
-  Checker::RegisterKeyWord("SHOW");
-  Checker::RegisterKeyWord("DATABASE");
-  Checker::RegisterKeyWord("DATABASES");
-  Checker::RegisterKeyWord("USE");
-  Checker::RegisterKeyWord("SELECT");
-  Checker::RegisterKeyWord("TABLE");
-  Checker::RegisterKeyWord("TABLES");
-  Checker::RegisterKeyWord("SELECT");
-  Checker::RegisterKeyWord("INSERT");
-  Checker::RegisterKeyWord("INTO");
-  Checker::RegisterKeyWord("VALUES");
-  Checker::RegisterKeyWord("FROM");
-  Checker::RegisterKeyWord("UNIQUE");
-  Checker::RegisterKeyWord("KEY");
-
-  Checker::RegisterType("INT");
-  // Checker::RegisterType("Varchar");
-  Checker::RegisterType("STRING");
-  Checker::RegisterType("DOUBLE");
-
-  Checker::RegisterFunction("ABS", std::make_shared<DB::FunctionAbs>());
-  Checker::RegisterFunction("CAST", std::make_shared<DB::FunctionCast>());
-  Checker::RegisterFunction("TO_UPPER",
-                            std::make_shared<DB::FunctionToUpper>());
-  Checker::RegisterFunction("TO_LOWER",
-                            std::make_shared<DB::FunctionToLower>());
 }

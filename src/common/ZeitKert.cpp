@@ -1,6 +1,10 @@
 #include "common/ZeitKert.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
+#include "function/Abs.hpp"
+#include "function/FunctionCast.hpp"
+#include "function/FunctionString.hpp"
+#include "parser/Checker.hpp"
 #include "parser/statement/CreateStatement.hpp"
 #include "parser/statement/DropStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
@@ -10,6 +14,44 @@
 #include <memory>
 
 namespace DB {
+
+static void RegisterChecker() {
+  static bool registered = false;
+  if (registered) {
+    return;
+  }
+  registered = true;
+
+  Checker::RegisterKeyWord("CREATE");
+  Checker::RegisterKeyWord("DROP");
+  Checker::RegisterKeyWord("SHOW");
+  Checker::RegisterKeyWord("DATABASE");
+  Checker::RegisterKeyWord("DATABASES");
+  Checker::RegisterKeyWord("USE");
+  Checker::RegisterKeyWord("SELECT");
+  Checker::RegisterKeyWord("TABLE");
+  Checker::RegisterKeyWord("TABLES");
+  Checker::RegisterKeyWord("INSERT");
+  Checker::RegisterKeyWord("INTO");
+  Checker::RegisterKeyWord("VALUES");
+  Checker::RegisterKeyWord("FROM");
+  Checker::RegisterKeyWord("UNIQUE");
+  Checker::RegisterKeyWord("KEY");
+
+  Checker::RegisterType("INT");
+  Checker::RegisterType("STRING");
+  Checker::RegisterType("DOUBLE");
+
+  Checker::RegisterFunction("ABS", std::make_shared<FunctionAbs>());
+  Checker::RegisterFunction("CAST", std::make_shared<FunctionCast>());
+  Checker::RegisterFunction("TO_UPPER", std::make_shared<FunctionToUpper>());
+  Checker::RegisterFunction("TO_LOWER", std::make_shared<FunctionToLower>());
+}
+
+ZeitKert::ZeitKert() : context_(std::make_shared<QueryContext>()) {
+  RegisterChecker();
+}
+
 Status ZeitKert::HandleDropStatement() {
   auto &drop_statement =
       static_cast<DropStatement &>(*context_->sql_statement_);

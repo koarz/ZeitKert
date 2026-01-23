@@ -25,7 +25,7 @@ class ZeitKert {
   Status HandleShowStatement(ResultSet &result_set);
 
 public:
-  ZeitKert() : context_(std::make_shared<QueryContext>()) {}
+  ZeitKert();
 
   Status ExecuteQuery(std::string &query, ResultSet &result_set) {
     query.pop_back();
