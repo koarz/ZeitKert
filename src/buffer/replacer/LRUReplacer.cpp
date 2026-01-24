@@ -6,50 +6,73 @@
 
 namespace DB {
 LRUReplacer::LRUReplacer(size_t frame_num) : frame_num_(frame_num) {
-  list_ = new Node[frame_num];
-}
-
-LRUReplacer::~LRUReplacer() {
-  delete[] list_;
+  pin_counts_.resize(frame_num, 0);
+  iters_.resize(frame_num);
+  for (frame_id_t i = 0; i < frame_num; ++i) {
+    lru_list_.push_back(i);
+    iters_[i] = std::prev(lru_list_.end());
+  }
 }
 
 void LRUReplacer::Access(frame_id_t frame_id) {
-  list_[frame_id].time_stamp_ = ++curr_timestamp_;
   Pin(frame_id);
 }
 
 void LRUReplacer::Evict(frame_id_t *frame_id) {
-  int idx{-1};
-  for (int i = 0; i < frame_num_; i++) {
-    if (list_[i].pin_count_ > 0) {
-      continue;
-    }
-    if (list_[i].time_stamp_ == 0) {
-      *frame_id = i;
-      return;
-    }
-    if (idx == -1 || list_[i].time_stamp_ < list_[idx].time_stamp_) {
-      idx = i;
-    }
+  if (lru_list_.empty()) {
+    *frame_id = -1;
+    return;
   }
-  *frame_id = idx;
+
+  *frame_id = lru_list_.front();
+
+  lru_list_.pop_front();
+
+  iters_[*frame_id] = lru_list_.end();
 }
 
 bool LRUReplacer::IsEvictable(frame_id_t frame_id) {
-  return list_[frame_id].pin_count_ == 0;
+  return pin_counts_[frame_id] == 0;
 }
 
 void LRUReplacer::Pin(frame_id_t frame_id) {
-  list_[frame_id].pin_count_++;
+
+  if (frame_id >= frame_num_)
+    return;
+
+  pin_counts_[frame_id]++;
+
+  if (iters_[frame_id] != lru_list_.end()) {
+    lru_list_.erase(iters_[frame_id]);
+    iters_[frame_id] = lru_list_.end();
+  }
 }
 
 void LRUReplacer::UnPin(frame_id_t frame_id) {
-  list_[frame_id].pin_count_--;
+
+  if (frame_id >= frame_num_)
+    return;
+  if (pin_counts_[frame_id] == 0)
+    return;
+
+  pin_counts_[frame_id]--;
+
+  if (pin_counts_[frame_id] == 0) {
+    if (iters_[frame_id] == lru_list_.end()) {
+      lru_list_.push_back(frame_id);
+      iters_[frame_id] = std::prev(lru_list_.end());
+    }
+  }
 }
 
 void LRUReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {}
 
 uint64_t LRUReplacer::GetPinCount(frame_id_t frame_id) {
-  return list_[frame_id].pin_count_;
+  return pin_counts_[frame_id];
 }
+
+size_t LRUReplacer::Size() {
+  return lru_list_.size();
+}
+
 } // namespace DB

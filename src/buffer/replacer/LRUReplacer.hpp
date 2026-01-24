@@ -6,16 +6,18 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <list>
+#include <vector>
 
 namespace DB {
 class LRUReplacer final : public Replacer {
-  struct Node {
-    uint64_t pin_count_{};
-    timestamp_t time_stamp_{};
-  };
   const size_t frame_num_;
-  Node *list_;
-  std::atomic<timestamp_t> curr_timestamp_{};
+
+  std::vector<uint64_t> pin_counts_;
+
+  std::list<frame_id_t> lru_list_;
+
+  std::vector<std::list<frame_id_t>::iterator> iters_;
 
 public:
   LRUReplacer(size_t frame_num);
@@ -23,7 +25,7 @@ public:
   LRUReplacer(const LRUReplacer &) = delete;
   LRUReplacer(LRUReplacer &&) = delete;
 
-  ~LRUReplacer() override;
+  ~LRUReplacer() override{};
 
   void Evict(frame_id_t *frame_id) override;
 
@@ -38,5 +40,7 @@ public:
   void UnPin(frame_id_t frame_id) override;
 
   uint64_t GetPinCount(frame_id_t frame_id) override;
+
+  size_t Size();
 };
 } // namespace DB
