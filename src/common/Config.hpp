@@ -20,8 +20,8 @@ constexpr uint32_t SSTABLE_SIZE = 8192;
 constexpr size_t DEFAULT_PAGE_SIZE = 4096;
 constexpr size_t DEFAULT_POOL_SIZE = 128;
 #else
-// per sstable size is 4MB
-constexpr uint32_t SSTABLE_SIZE = 0x400000;
+// per sstable size is 64MB
+constexpr uint32_t SSTABLE_SIZE = 0x4000000;
 constexpr size_t DEFAULT_PAGE_SIZE = 32768;
-constexpr size_t DEFAULT_POOL_SIZE = 2048;
+constexpr size_t DEFAULT_POOL_SIZE = 65536;
 #endif
