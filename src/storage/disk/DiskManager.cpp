@@ -93,8 +93,15 @@ Status DiskManager::ReadPage(std::fstream &fs, page_id_t page_id, Byte *data) {
   latch_.lock();
   std::unique_lock latch(latchs_[&fs]);
   latch_.unlock();
-  int offset = page_id * DEFAULT_PAGE_SIZE;
-  fs.seekp(offset);
+  if (!fs.is_open()) {
+    return Status::Error(ErrorCode::FileNotOpen, "File not open");
+  }
+  auto offset = static_cast<std::streamoff>(page_id) * DEFAULT_PAGE_SIZE;
+  fs.clear();
+  fs.seekg(offset, std::ios::beg);
+  if (fs.fail()) {
+    return Status::Error(ErrorCode::IOError, "I/O error when seeking page");
+  }
   fs.read(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
   if (fs.bad()) {
     return Status::Error(ErrorCode::IOError, "I/O error when reading page");
@@ -111,10 +118,17 @@ Status DiskManager::WritePage(std::fstream &fs, page_id_t page_id, Byte *data) {
   latch_.lock();
   std::unique_lock latch(latchs_[&fs]);
   latch_.unlock();
-  int offset = page_id * DEFAULT_PAGE_SIZE;
-  fs.seekg(offset);
+  if (!fs.is_open()) {
+    return Status::Error(ErrorCode::FileNotOpen, "File not open");
+  }
+  auto offset = static_cast<std::streamoff>(page_id) * DEFAULT_PAGE_SIZE;
+  fs.clear();
+  fs.seekp(offset, std::ios::beg);
+  if (fs.fail()) {
+    return Status::Error(ErrorCode::IOError, "I/O error when seeking page");
+  }
   fs.write(reinterpret_cast<char *>(data), DEFAULT_PAGE_SIZE);
-  if (fs.bad()) {
+  if (fs.fail()) {
     return Status::Error(ErrorCode::IOError, "I/O error when writing page");
   }
   fs.flush();
