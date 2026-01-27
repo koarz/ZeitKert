@@ -7,11 +7,11 @@
 namespace DB {
 SKIP_LIST_TEMPLATE_HEAD
 uint32_t SkipList<Key, Value, KeyCompare>::GetRandomLevel() {
-  static std::random_device rd;
-  static std::mt19937 gen(rd());
-  static std::geometric_distribution<> distrib;
-  // make sure not 0
-  return distrib(gen) % max_level_ ?: 1;
+  static thread_local std::mt19937 gen(std::random_device{}());
+  static thread_local std::geometric_distribution<uint32_t> dist(0.5);
+
+  uint32_t level = dist(gen) + 1;
+  return std::min(level, max_level_);
 }
 
 SKIP_LIST_TEMPLATE_HEAD
