@@ -45,8 +45,7 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
           return nullptr;
         }
       }
-      columns.emplace_back(
-          std::make_shared<ColumnMeta>(col_name, type, nullptr));
+      columns.emplace_back(std::make_shared<ColumnMeta>(col_name, type));
     }
 
     // 解析 UNIQUE KEY 子句
@@ -58,17 +57,26 @@ Transform::TransCreateQuery(ASTPtr node, std::string &message,
       }
     }
 
+    if (unique_key.empty()) {
+      message = "table has no primary key";
+      return nullptr;
+    }
+
     if (!unique_key.empty()) {
-      bool found = false;
+      ColumnMetaRef unique_col;
       for (const auto &col : columns) {
         if (col->name_ == unique_key) {
-          found = true;
+          unique_col = col;
           break;
         }
       }
-      if (!found) {
+      if (!unique_col) {
         message =
             "UNIQUE KEY column '" + unique_key + "' not found in table columns";
+        return nullptr;
+      }
+      if (unique_col->type_->GetType() == ValueType::Type::Double) {
+        message = "UNIQUE KEY column '" + unique_key + "' cannot be DOUBLE";
         return nullptr;
       }
     }

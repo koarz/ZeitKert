@@ -56,8 +56,11 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
   }
   case BoundExpressType::BoundColumnMeta: {
     auto &exp = static_cast<BoundColumnMeta &>(*expr);
+    auto table_meta = exp.GetTableMeta();
+    auto lsm_tree = context_->GetOrCreateLSMTree(table_meta);
     return std::make_shared<ScanColumnPlanNode>(std::make_shared<Schema>(),
-                                                exp.GetColumnMeta());
+                                                exp.GetColumnMeta(), lsm_tree,
+                                                exp.GetColumnMeta()->index_);
   }
   }
   return nullptr;

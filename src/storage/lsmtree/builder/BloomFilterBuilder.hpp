@@ -24,8 +24,8 @@ public:
     data_.resize(total_bytes, 0);
   }
 
-  void AddKey(Slice *key) {
-    uint64_t h = Hash64(key->GetData(), key->Size());
+  void AddKey(const Slice &key) {
+    uint64_t h = Hash64(key.GetData(), key.Size());
     uint32_t block_idx = (h >> 32) % num_blocks_;
 
     uint32_t current_h = static_cast<uint32_t>(h);

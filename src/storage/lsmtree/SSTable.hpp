@@ -1,6 +1,7 @@
 #pragma once
 
-#include "storage/lsmtree/Slice.hpp"
+#include "storage/MMapFile.hpp"
+#include "storage/lsmtree/RowGroupMeta.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -10,51 +11,23 @@
 
 namespace DB {
 // clang-format off
-// +----------------------------------------------+-------------------------------------------+-----------------------------+---------------+
-// |                Data Section                  |                Index Section              |       Offset Section        |     Extra     |
-// +----------------------------------------------+-------------------------------------------+-----------------------------+---------------+
-// | block[0] | block[1] | ... | block[n] | empty | block[1] max key | block[2] max key | ... | offset[0] | offset[1] | ... | num_of_blocks |
-// +----------------------------------------------+-------------------------------------------+-----------------------------+---------------+
-// size: Extra(2 bytes), Offset Section(num_of_elements * 4 bytes), Data Section(32KB * num_of_blocks)
-
-// +---------------------------------------------------+
-// |                       Entry                       |
-// +------------+----------+--------------+------------+
-// | key_length | key_data | value_length | value_data |
-// +------------+----------+--------------+------------+
-// size: key_length(2 bytes), key_data(key_length bytes), value_length(2 bytes), value_data(value_length bytes)
+// +---------------------------+-------------------------+-------------+
+// |         数据区            |    RowGroup 元数据区    |    Footer   |
+// +---------------------------+-------------------------+-------------+
+// | rowgroup[0] ... rowgroup[n] | rowgroup_meta[...]    | fixed-size  |
+// +---------------------------+-------------------------+-------------+
+// 数据区  每个 RowGroup 使用 PAX 布局 并按 4KB 对齐
+// 元数据区  记录 RowGroup 偏移 列分块 zonemap bloom 与最大主键
+// Footer  记录 meta offset size rowgroup count column count pk index version magic
 // clang-format on
-
-// Every SSTable always 4MB
-// level0 max sstable num: 4
-// level1 max sstable num: 10
-// level2 max sstable num: 100
-// ...
-// so if we know how many sstable num is
-// we can directly caculate max level
-constexpr uint LEVEL[]{0, 4, 14, 114, 1114, 11114 /* 40GB */};
-
-inline uint32_t GetLevel(uint32_t table_id, uint32_t total_table) {
-  if (table_id >= total_table) {
-    return 0xffffffff;
-  }
-  int max_level =
-      std::lower_bound(LEVEL, LEVEL + sizeof(LEVEL) / 4, total_table) - LEVEL;
-  int t = table_id + 1;
-  for (int i = max_level; i > 0; i--) {
-    t -= (LEVEL[i] - LEVEL[i - 1]);
-    if (t <= 0) {
-      return i - 1;
-    }
-  }
-  return 0;
-}
 
 struct SSTable {
   uint32_t sstable_id_;
-  uint32_t num_of_blocks_;
-  std::vector<Slice> index_;
-  std::vector<uint32_t> offsets_;
+  uint32_t rowgroup_count_{};
+  uint16_t column_count_{};
+  uint16_t primary_key_idx_{};
+  std::vector<RowGroupMeta> rowgroups_;
+  std::shared_ptr<MMapFile> data_file_;
 };
 
 using SSTableRef = std::shared_ptr<SSTable>;

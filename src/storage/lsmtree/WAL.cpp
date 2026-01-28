@@ -1,10 +1,9 @@
 #include "storage/lsmtree/WAL.hpp"
 #include "common/Status.hpp"
-#include "storage/lsmtree/Coding.hpp"
 #include "storage/lsmtree/Slice.hpp"
 
+#include <limits>
 #include <memory>
-#include <tuple>
 
 namespace DB {
 Status WAL::WriteSlice(const Slice &key, const Slice &value) {
@@ -16,12 +15,16 @@ Status WAL::WriteSlice(const Slice &key, const Slice &value) {
     fs_.open(path_, std::ios::binary | std::ios_base::in | std::ios_base::out |
                         std::ios_base::app | std::ios_base::ate);
   }
-  auto klen = key.Size();
-  auto vlen = value.Size();
-  auto total_len = klen + vlen + 8;
-  std::string buffer(total_len, 0);
-  std::ignore = ParseSliceToEntry(key, value, buffer.data());
-  fs_.write(reinterpret_cast<char *>(buffer.data()), total_len);
+  uint32_t klen = key.Size();
+  uint32_t vlen = value.Size();
+  fs_.write(reinterpret_cast<const char *>(&klen), sizeof(klen));
+  fs_.write(reinterpret_cast<const char *>(&vlen), sizeof(vlen));
+  if (klen > 0) {
+    fs_.write(reinterpret_cast<const char *>(key.GetData()), klen);
+  }
+  if (vlen > 0) {
+    fs_.write(reinterpret_cast<const char *>(value.GetData()), vlen);
+  }
   if (fs_.bad()) {
     return Status::Error(ErrorCode::IOError, "I/O error when writing page");
   }
@@ -30,19 +33,31 @@ Status WAL::WriteSlice(const Slice &key, const Slice &value) {
 }
 
 bool WAL::ReadFromLogFile(Slice *key, Slice *value) {
-  int len;
-  fs_.read(reinterpret_cast<char *>(&len), 4);
+  uint32_t klen = 0;
+  uint32_t vlen = 0;
+  fs_.read(reinterpret_cast<char *>(&klen), sizeof(klen));
   if (fs_.eof()) {
     fs_.seekp(std::ios::end);
     return false;
   }
-  auto buffer = std::make_unique<char[]>(len);
-  fs_.read(buffer.get(), len);
-  *key = Slice(buffer.get(), len);
-  fs_.read(reinterpret_cast<char *>(&len), 4);
-  buffer = std::make_unique<char[]>(len);
-  fs_.read(buffer.get(), len);
-  *value = Slice(buffer.get(), len);
+  fs_.read(reinterpret_cast<char *>(&vlen), sizeof(vlen));
+  if (!fs_) {
+    return false;
+  }
+  if (klen > std::numeric_limits<uint16_t>::max() ||
+      vlen > std::numeric_limits<uint16_t>::max()) {
+    return false;
+  }
+  auto kbuf = std::make_unique<char[]>(klen);
+  if (klen > 0) {
+    fs_.read(kbuf.get(), klen);
+  }
+  auto vbuf = std::make_unique<char[]>(vlen);
+  if (vlen > 0) {
+    fs_.read(vbuf.get(), vlen);
+  }
+  *key = Slice(kbuf.get(), static_cast<uint16_t>(klen));
+  *value = Slice(vbuf.get(), static_cast<uint16_t>(vlen));
   return true;
 }
 } // namespace DB

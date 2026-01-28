@@ -15,9 +15,18 @@ Database::Database(std::filesystem::path path,
                    std::shared_ptr<BufferPoolManager> buffer_pool_manager)
     : path_(path), disk_manager_(disk_manager) {
   for (const auto &entry : std::filesystem::directory_iterator(path)) {
+    if (!entry.is_directory()) {
+      continue;
+    }
+    auto meta_path = entry.path() / TableMeta::default_table_meta_name;
+    if (!std::filesystem::exists(meta_path)) {
+      continue;
+    }
+    if (std::filesystem::file_size(meta_path) == 0) {
+      continue;
+    }
     auto [it, _] = table_metas_.emplace(
-        entry.path().filename(),
-        std::make_shared<TableMeta>(entry.path(), buffer_pool_manager));
+        entry.path().filename(), std::make_shared<TableMeta>(entry.path()));
   }
 }
 
@@ -25,8 +34,9 @@ Status Database::CreateTable(std::string &table_name,
                              std::vector<std::shared_ptr<ColumnMeta>> &columns,
                              std::string unique_key) {
   table_metas_.emplace(
-      table_name, std::make_shared<TableMeta>(table_name, std::move(columns),
-                                              std::move(unique_key)));
+      table_name,
+      std::make_shared<TableMeta>(path_ / table_name, table_name,
+                                  std::move(columns), std::move(unique_key)));
   return disk_manager_->CreateTable(path_ / table_name,
                                     table_metas_.rbegin()->second->Serialize());
 }

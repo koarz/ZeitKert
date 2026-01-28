@@ -19,9 +19,14 @@ constexpr page_id_t INVALID_PAGE_ID = -1;
 constexpr uint32_t SSTABLE_SIZE = 8192;
 constexpr size_t DEFAULT_PAGE_SIZE = 4096;
 constexpr size_t DEFAULT_POOL_SIZE = 128;
+constexpr size_t DEFAULT_ROWGROUP_TARGET_SIZE = 64 * 1024;
+constexpr size_t DEFAULT_ROWGROUP_ALIGNMENT = 4096;
 #else
-// per sstable size is 64MB
-constexpr uint32_t SSTABLE_SIZE = 0x4000000;
-constexpr size_t DEFAULT_PAGE_SIZE = 32768;
-constexpr size_t DEFAULT_POOL_SIZE = 65536;
+// per sstable size is 8MB
+constexpr uint32_t SSTABLE_SIZE = 8 * 1024 * 1024;
+constexpr size_t DEFAULT_PAGE_SIZE = 4096;
+constexpr size_t DEFAULT_POOL_SIZE = 4096;
+constexpr size_t DEFAULT_ROWGROUP_TARGET_SIZE = 256 * 1024;
+constexpr size_t DEFAULT_ROWGROUP_ALIGNMENT = 4096;
 #endif
+constexpr size_t ZONE_MAP_PREFIX_LEN = 32;

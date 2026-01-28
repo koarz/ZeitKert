@@ -20,6 +20,15 @@ Transform::TransInsertQuery(ASTPtr node, std::string &message,
     return nullptr;
   }
   auto res = std::make_shared<InsertStatement>();
+  if (insert_query.IsBulk()) {
+    if (insert_query.GetBulkRows() == 0) {
+      message = "bulk insert rows must be greater than 0";
+      return nullptr;
+    }
+    res->table_ = table_meta;
+    res->SetBulkRows(insert_query.GetBulkRows());
+    return res;
+  }
   if (auto select_query = insert_query.GetSelect(); select_query != nullptr) {
     // select
     res->select_ = TransSelectQuery(select_query, message, context);

@@ -64,7 +64,7 @@ BoundExpressRef Transform::MakeZeroConstant() {
 void Transform::AppendColumns(const TableMetaRef &table,
                               std::vector<BoundExpressRef> &columns) {
   for (auto &col_meta : table->GetColumns()) {
-    columns.emplace_back(std::make_shared<BoundColumnMeta>(col_meta));
+    columns.emplace_back(std::make_shared<BoundColumnMeta>(table, col_meta));
   }
 }
 
@@ -101,7 +101,7 @@ BoundExpressRef Transform::ResolveQualifiedColumn(
   for (auto &table : tables) {
     if (table->GetTableName() == table_name) {
       if (auto meta = FindColumn(table, column_name)) {
-        return std::make_shared<BoundColumnMeta>(meta);
+        return std::make_shared<BoundColumnMeta>(table, meta);
       }
       message = fmt::format("table {} doesn't contain column {}", table_name,
                             column_name);
@@ -118,6 +118,7 @@ Transform::ResolveUnqualifiedColumn(std::vector<TableMetaRef> &tables,
                                     const std::string &column_name,
                                     std::string &message) {
   ColumnMetaRef matched{};
+  TableMetaRef matched_table{};
   for (auto &table : tables) {
     if (auto meta = FindColumn(table, column_name)) {
       if (matched != nullptr) {
@@ -125,13 +126,14 @@ Transform::ResolveUnqualifiedColumn(std::vector<TableMetaRef> &tables,
         return nullptr;
       }
       matched = meta;
+      matched_table = table;
     }
   }
   if (matched == nullptr) {
     message = fmt::format("column {} not exist", column_name);
     return nullptr;
   }
-  return std::make_shared<BoundColumnMeta>(matched);
+  return std::make_shared<BoundColumnMeta>(matched_table, matched);
 }
 
 // 跳过多余的逗号

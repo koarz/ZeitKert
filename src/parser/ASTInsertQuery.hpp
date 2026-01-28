@@ -8,6 +8,8 @@ namespace DB {
 class InsertQuery : public AST {
   std::string insert_into_;
   ASTPtr select_;
+  bool is_bulk_{false};
+  size_t bulk_rows_{0};
 
 public:
   explicit InsertQuery(std::string insert_into, ASTPtr select)
@@ -17,5 +19,14 @@ public:
   std::string GetInsertIntoName() { return insert_into_; }
 
   ASTPtr GetSelect() { return select_; }
+
+  void SetBulkRows(size_t rows) {
+    is_bulk_ = true;
+    bulk_rows_ = rows;
+  }
+
+  bool IsBulk() const { return is_bulk_; }
+
+  size_t GetBulkRows() const { return bulk_rows_; }
 };
 } // namespace DB

@@ -15,10 +15,12 @@
 #include <stdatomic.h>
 #include <string>
 #include <sys/types.h>
+#include <utility>
 #include <vector>
 
 namespace DB {
 class TableMeta {
+  std::filesystem::path table_path_;
   std::string table_name_;
   atomic_uint32_t row_number_;
   std::vector<ColumnMetaRef> columns_;
@@ -27,9 +29,9 @@ class TableMeta {
 
 public:
   static constexpr std::string default_table_meta_name = "table_meta.json";
-  explicit TableMeta(std::filesystem::path table_path,
-                     std::shared_ptr<BufferPoolManager> buffer_pool_manager) {
-    std::ifstream fs{table_path / default_table_meta_name};
+  explicit TableMeta(std::filesystem::path table_path) {
+    table_path_ = std::move(table_path);
+    std::ifstream fs{table_path_ / default_table_meta_name};
     std::string meta_data((std::istreambuf_iterator<char>(fs)),
                           std::istreambuf_iterator<char>());
     fs.close();
@@ -41,30 +43,18 @@ public:
     for (const auto &column : json["columns"]) {
       auto name = column["name"].get_string().value();
       auto type = column["type"].get_string().value();
-      auto table_number =
-          std::stoul(std::string(column["table_number"].get_string().value()));
       // auto nullable = column["nullable"].get_bool();
       if (type == "int") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Int>(),
-            std::make_shared<LSMTree>(table_path / name, table_number,
-                                      buffer_pool_manager,
-                                      std::make_shared<Int>())));
+            std::string(name), std::make_shared<Int>(), idx));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "string") {
         columns_.push_back(std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<String>(),
-            std::make_shared<LSMTree>(table_path / name, table_number,
-                                      buffer_pool_manager,
-                                      std::make_shared<String>())));
+            std::string(name), std::make_shared<String>(), idx));
         name_map_column_idx_.emplace(name, idx++);
       } else if (type == "double") {
-        auto col_meta = std::make_shared<ColumnMeta>(
-            std::string(name), std::make_shared<Double>(),
-            std::make_shared<LSMTree>(table_path / name, table_number,
-                                      buffer_pool_manager,
-                                      std::make_shared<Double>()));
-        columns_.push_back(col_meta);
+        columns_.push_back(std::make_shared<ColumnMeta>(
+            std::string(name), std::make_shared<Double>(), idx));
         name_map_column_idx_.emplace(name, idx++);
       }
     }
@@ -74,10 +64,19 @@ public:
     }
   }
 
-  explicit TableMeta(std::string table_name, std::vector<ColumnMetaRef> columns,
+  explicit TableMeta(std::filesystem::path table_path, std::string table_name,
+                     std::vector<ColumnMetaRef> columns,
                      std::string unique_key = "")
-      : table_name_(std::move(table_name)), columns_(std::move(columns)),
-        unique_key_column_name_(std::move(unique_key)) {}
+      : table_path_(std::move(table_path)), table_name_(std::move(table_name)),
+        columns_(std::move(columns)),
+        unique_key_column_name_(std::move(unique_key)) {
+    row_number_ = 0;
+    uint32_t idx = 0;
+    for (auto &col : columns_) {
+      col->index_ = idx;
+      name_map_column_idx_.emplace(col->name_, idx++);
+    }
+  }
 
   std::string Serialize() {
     rapidjson::StringBuffer buffer;
@@ -98,12 +97,6 @@ public:
       writer.String(column->name_.c_str());
       writer.Key("type");
       writer.String(column->type_->ToString().c_str());
-      writer.Key("table_number");
-      if (column->lsm_tree_ == nullptr) {
-        writer.String("0");
-      } else {
-        writer.String(std::to_string(column->lsm_tree_->GetTableNum()).c_str());
-      }
       writer.EndObject();
     }
 
@@ -125,6 +118,8 @@ public:
 
   std::string GetTableName() { return table_name_; }
 
+  std::filesystem::path GetTablePath() { return table_path_; }
+
   atomic_uint32_t &GetRowNumber() { return row_number_; }
 
   std::string GetUniqueKeyColumn() { return unique_key_column_name_; }
@@ -134,6 +129,30 @@ public:
   }
 
   bool HasUniqueKey() { return !unique_key_column_name_.empty(); }
+
+  uint32_t GetColumnIndex(const std::string &col_name) {
+    return name_map_column_idx_[col_name];
+  }
+
+  int GetPrimaryKeyIndex() {
+    if (unique_key_column_name_.empty()) {
+      return -1;
+    }
+    auto it = name_map_column_idx_.find(unique_key_column_name_);
+    if (it == name_map_column_idx_.end()) {
+      return -1;
+    }
+    return static_cast<int>(it->second);
+  }
+
+  std::vector<std::shared_ptr<ValueType>> GetColumnTypes() {
+    std::vector<std::shared_ptr<ValueType>> types;
+    types.reserve(columns_.size());
+    for (const auto &col : columns_) {
+      types.push_back(col->type_);
+    }
+    return types;
+  }
 };
 
 using TableMetaRef = std::shared_ptr<TableMeta>;

@@ -7,7 +7,7 @@
 
 namespace DB {
 Status MemTable::Put(const Slice &key, const Slice &value) {
-  auto add_size = key.Size() + value.Size() + 4;
+  auto add_size = key.Size() + value.Size() + 8;
   approximate_size_.fetch_add(add_size);
   skip_list_.Insert(key, value);
   auto status = wal_.WriteSlice(key, value);
@@ -21,7 +21,7 @@ Status MemTable::Get(const Slice &key, Slice *value) {
 void MemTable::RecoverFromWal() {
   Slice key, value;
   while (wal_.ReadFromLogFile(&key, &value)) {
-    auto add_size = key.Size() + value.Size() + 4;
+    auto add_size = key.Size() + value.Size() + 8;
     approximate_size_.fetch_add(add_size);
     skip_list_.Insert(key, value);
   }

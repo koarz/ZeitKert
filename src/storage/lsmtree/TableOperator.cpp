@@ -7,16 +7,22 @@
 #include "storage/lsmtree/iterator/Iterator.hpp"
 #include "storage/lsmtree/iterator/MergeIterator.hpp"
 
+#include <algorithm>
+#include <cstring>
 #include <filesystem>
 #include <memory>
+#include <string>
+#include <tuple>
 
 namespace DB {
-Status TableOperator::BuildSSTable(std::filesystem::path path,
-                                   uint32_t &table_id,
-                                   std::vector<MemTableRef> &memtables,
-                                   SSTableRef &sstable_meta) {
-  SSTableBuilder builder(path, table_id);
+Status TableOperator::BuildSSTable(
+    std::filesystem::path path, uint32_t &table_id,
+    std::vector<MemTableRef> &memtables,
+    const std::vector<std::shared_ptr<ValueType>> &column_types,
+    uint16_t primary_key_idx, SSTableRef &sstable_meta) {
+  SSTableBuilder builder(path, table_id, column_types, primary_key_idx);
   std::vector<std::shared_ptr<Iterator>> iters;
+  // 新到旧合并 memtable
   for (auto it = memtables.rbegin(); it != memtables.rend(); it++) {
     iters.push_back(
         std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
@@ -28,9 +34,10 @@ Status TableOperator::BuildSSTable(std::filesystem::path path,
     }
     iter.Next();
   }
-  // write other data to wal file
-  // use rewrite flag for open a new file
+  // 其余数据写入 wal 文件
+  // 重新打开 wal 文件写入
   WAL wal(path, true, true);
+  // 剩余数据写回 wal
   while (iter.Valid()) {
     auto s = wal.WriteSlice(iter.GetKey(), iter.GetValue());
     if (!s.ok()) {
@@ -44,38 +51,120 @@ Status TableOperator::BuildSSTable(std::filesystem::path path,
   return s;
 }
 
-Status TableOperator::ReadSSTable(std::filesystem::path path,
-                                  SSTableRef sstable_meta) {
+static constexpr uint32_t kSSTableMagic = 0x5A4B5254; // ZKRT
+static constexpr uint16_t kSSTableVersion = 1;
+
+static Status ReadRange(std::filesystem::path path, uint32_t offset,
+                        uint32_t size,
+                        std::shared_ptr<BufferPoolManager> buffer_pool,
+                        std::string &out) {
+  out.resize(size);
+  if (size == 0) {
+    return Status::OK();
+  }
+  // 通过 bufferpool 按页读取文件片段
+  uint32_t end = offset + size;
+  uint32_t start_page = offset / DEFAULT_PAGE_SIZE;
+  uint32_t end_page = (end - 1) / DEFAULT_PAGE_SIZE;
+  for (uint32_t page_id = start_page; page_id <= end_page; page_id++) {
+    Page *page = nullptr;
+    auto status = buffer_pool->FetchPage(path, page_id, page);
+    if (!status.ok()) {
+      return status;
+    }
+    auto lock = page->GetReadLock();
+    uint32_t page_start = page_id * DEFAULT_PAGE_SIZE;
+    uint32_t copy_start = std::max<uint32_t>(offset, page_start);
+    uint32_t copy_end = std::min<uint32_t>(
+        end, page_start + static_cast<uint32_t>(DEFAULT_PAGE_SIZE));
+    std::memcpy(out.data() + (copy_start - offset),
+                page->GetData() + (copy_start - page_start),
+                copy_end - copy_start);
+    std::ignore = buffer_pool->UnPinPage(path, page_id);
+  }
+  return Status::OK();
+}
+
+Status TableOperator::ReadSSTable(
+    std::filesystem::path path, SSTableRef sstable_meta,
+    const std::vector<std::shared_ptr<ValueType>> &column_types,
+    std::shared_ptr<BufferPoolManager> buffer_pool) {
   path = path / fmt::format("{}.sst", sstable_meta->sstable_id_);
-  auto file_size = std::filesystem::file_size(path);
-  std::ifstream fs;
-  fs.open(path, std::ios::binary | std::ios::in);
-  if (!fs.is_open()) {
+  if (!std::filesystem::exists(path)) {
     return Status::Error(
         ErrorCode::FileNotOpen,
         fmt::format("The sstable {} was not exist", path.filename().c_str()));
   }
-  // read offset and blocks num
-  fs.seekg(file_size - 6);
-  uint32_t offset_num;
-  fs.read(reinterpret_cast<char *>(&offset_num), 4);
-  fs.read(reinterpret_cast<char *>(&sstable_meta->num_of_blocks_), 2);
-  fs.seekg(file_size - 6 - 4 * offset_num);
-  for (int i = 0; i < offset_num; i++) {
-    uint32_t offset;
-    fs.read(reinterpret_cast<char *>(&offset), 4);
-    sstable_meta->offsets_.push_back(offset);
+  auto file_size = std::filesystem::file_size(path);
+  constexpr uint32_t footer_size = sizeof(uint32_t) * 4 + sizeof(uint16_t) * 4;
+  if (file_size < footer_size) {
+    return Status::Error(ErrorCode::IOError, "SSTable footer truncated");
   }
-  fs.seekg(sstable_meta->num_of_blocks_ * DEFAULT_PAGE_SIZE);
-  // read index
-  for (int i = 0; i < sstable_meta->num_of_blocks_; i++) {
-    uint32_t klen;
-    fs.read(reinterpret_cast<char *>(&klen), 4);
-    auto buffer = std::make_unique<Byte[]>(klen);
-    fs.read(buffer.get(), klen);
-    sstable_meta->index_.push_back(
-        Slice{buffer.get(), static_cast<uint16_t>(klen)});
+
+  std::string footer_blob;
+  // Footer 固定长度从文件末尾读取
+  auto status = ReadRange(path, static_cast<uint32_t>(file_size - footer_size),
+                          footer_size, buffer_pool, footer_blob);
+  if (!status.ok()) {
+    return status;
   }
+  const Byte *p = reinterpret_cast<const Byte *>(footer_blob.data());
+  const Byte *end = p + footer_blob.size();
+  auto read = [&](auto &v) {
+    if (p + sizeof(v) > end) {
+      return false;
+    }
+    std::memcpy(&v, p, sizeof(v));
+    p += sizeof(v);
+    return true;
+  };
+
+  uint32_t meta_offset = 0;
+  uint32_t meta_size = 0;
+  uint32_t rowgroup_count = 0;
+  uint16_t column_count = 0;
+  uint16_t primary_key_idx = 0;
+  uint16_t version = 0;
+  uint16_t reserved = 0;
+  uint32_t magic = 0;
+  if (!read(meta_offset) || !read(meta_size) || !read(rowgroup_count) ||
+      !read(column_count) || !read(primary_key_idx) || !read(version) ||
+      !read(reserved) || !read(magic)) {
+    return Status::Error(ErrorCode::IOError, "SSTable footer corrupted");
+  }
+  // 校验版本和列数
+  if (magic != kSSTableMagic || version != kSSTableVersion) {
+    return Status::Error(ErrorCode::IOError, "SSTable version mismatch");
+  }
+  if (column_count != column_types.size()) {
+    return Status::Error(ErrorCode::IOError, "SSTable column count mismatch");
+  }
+  if (meta_offset + meta_size > file_size) {
+    return Status::Error(ErrorCode::IOError, "SSTable meta out of range");
+  }
+
+  std::string meta_blob;
+  // 读取 RowGroup 元数据段
+  status = ReadRange(path, meta_offset, meta_size, buffer_pool, meta_blob);
+  if (!status.ok()) {
+    return status;
+  }
+  p = reinterpret_cast<const Byte *>(meta_blob.data());
+  end = p + meta_blob.size();
+  sstable_meta->rowgroups_.clear();
+  sstable_meta->rowgroups_.reserve(rowgroup_count);
+  for (uint32_t i = 0; i < rowgroup_count; i++) {
+    RowGroupMeta meta;
+    if (!RowGroupMeta::Deserialize(p, end, column_types, meta)) {
+      return Status::Error(ErrorCode::IOError, "SSTable meta corrupted");
+    }
+    sstable_meta->rowgroups_.push_back(std::move(meta));
+  }
+  // 数据段使用 mmap 读取
+  sstable_meta->rowgroup_count_ = rowgroup_count;
+  sstable_meta->column_count_ = column_count;
+  sstable_meta->primary_key_idx_ = primary_key_idx;
+  sstable_meta->data_file_ = std::make_shared<MMapFile>(path);
   return Status::OK();
 }
 } // namespace DB

@@ -27,6 +27,12 @@ SELECT * FROM users
 2 Bob
 3 Charlie
 
+# Count测试
+query
+SELECT COUNT(uid) FROM users
+----
+3
+
 # Unique key测试 - 插入重复uid应该更新
 statement ok
 INSERT INTO users VALUES (1, 'Alice Updated')

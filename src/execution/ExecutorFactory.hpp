@@ -52,7 +52,8 @@ struct ExecutorFactory {
         children.push_back(CreateExecutor(child));
       }
       return std::make_unique<InsertExecutor>(
-          p.GetSchemaRef(), std::move(children), p.GetTableMeta());
+          p.GetSchemaRef(), std::move(children), p.GetTableMeta(),
+          p.GetLSMTree(), p.GetBulkRows());
     }
     case PlanType::Tuple: {
       auto &p = static_cast<TuplePlanNode &>(*plan);
@@ -65,8 +66,9 @@ struct ExecutorFactory {
     }
     case PlanType::SeqScan: {
       auto &p = static_cast<ScanColumnPlanNode &>(*plan);
-      return std::make_unique<ScanColumnExecutor>(p.GetSchemaRef(),
-                                                  p.GetColumnMeta());
+      return std::make_unique<ScanColumnExecutor>(
+          p.GetSchemaRef(), p.GetColumnMeta(), p.GetLSMTree(),
+          p.GetColumnIndex());
     }
     case PlanType::IndexScan:
     case PlanType::Update:

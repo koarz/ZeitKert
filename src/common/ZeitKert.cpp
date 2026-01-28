@@ -3,6 +3,7 @@
 #include "common/Status.hpp"
 #include "function/Abs.hpp"
 #include "function/FunctionCast.hpp"
+#include "function/FunctionCount.hpp"
 #include "function/FunctionString.hpp"
 #include "parser/Checker.hpp"
 #include "parser/statement/CreateStatement.hpp"
@@ -34,6 +35,7 @@ static void RegisterChecker() {
   Checker::RegisterKeyWord("INSERT");
   Checker::RegisterKeyWord("INTO");
   Checker::RegisterKeyWord("VALUES");
+  Checker::RegisterKeyWord("BULK");
   Checker::RegisterKeyWord("FROM");
   Checker::RegisterKeyWord("UNIQUE");
   Checker::RegisterKeyWord("KEY");
@@ -44,6 +46,7 @@ static void RegisterChecker() {
 
   Checker::RegisterFunction("ABS", std::make_shared<FunctionAbs>());
   Checker::RegisterFunction("CAST", std::make_shared<FunctionCast>());
+  Checker::RegisterFunction("COUNT", std::make_shared<FunctionCount>());
   Checker::RegisterFunction("TO_UPPER", std::make_shared<FunctionToUpper>());
   Checker::RegisterFunction("TO_LOWER", std::make_shared<FunctionToLower>());
 }
@@ -95,20 +98,6 @@ Status ZeitKert::HandleCreateStatement() {
         name, create_statement.GetColumns(), create_statement.GetUniqueKey());
     if (!s.ok()) {
       return s;
-    }
-    auto table_meta = context_->database_->GetTableMeta(name);
-
-    for (auto &c : table_meta->GetColumns()) {
-      auto col_path = context_->database_->GetPath() / name / c->name_;
-      std::error_code ec;
-      std::filesystem::create_directory(col_path, ec);
-      if (ec) {
-        return Status::Error(ErrorCode::CreateError,
-                             "Failed to create column directory: " +
-                                 ec.message());
-      }
-      c->lsm_tree_ = std::make_shared<LSMTree>(
-          col_path, 0, context_->buffer_pool_manager_, c->type_);
     }
     return s;
   } else {

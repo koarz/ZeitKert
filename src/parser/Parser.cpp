@@ -1,6 +1,7 @@
 #include "parser/Parser.hpp"
 #include "common/EnumClass.hpp"
 #include "common/Status.hpp"
+#include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
 #include "parser/ASTDropQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
@@ -224,6 +225,23 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
           }
           tree_ =
               std::make_shared<InsertQuery>(std::move(name), std::move(tree_));
+        } else if (s == "BULK") {
+          ++iterator;
+          if (iterator->type != TokenType::Number) {
+            goto SYNTAXERROR;
+          }
+          std::string count_str{iterator->begin, iterator->end};
+          if (!StringUtil::IsInteger(count_str)) {
+            goto SYNTAXERROR;
+          }
+          size_t count = std::stoull(count_str);
+          if (!(++iterator)->isEnd()) {
+            goto SYNTAXERROR;
+          }
+          auto insert_query =
+              std::make_shared<InsertQuery>(std::move(name), nullptr);
+          insert_query->SetBulkRows(count);
+          tree_ = std::move(insert_query);
         } else {
           goto SYNTAXERROR;
         }

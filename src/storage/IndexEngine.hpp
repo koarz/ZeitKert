@@ -11,17 +11,14 @@ class IndexEngine {
 protected:
   KeyComparator comparator_;
   std::filesystem::path column_path_;
-  std::shared_ptr<ValueType> value_type_;
   std::shared_ptr<BufferPoolManager> buffer_pool_manager_;
 
 public:
   IndexEngine(KeyComparator comparator, std::filesystem::path column_path,
-              std::shared_ptr<BufferPoolManager> buffer_pool_manager,
-              std::shared_ptr<ValueType> value_type)
+              std::shared_ptr<BufferPoolManager> buffer_pool_manager)
       : comparator_(std::move(comparator)),
         column_path_(std::move(column_path)),
-        buffer_pool_manager_(std::move(buffer_pool_manager)),
-        value_type_(value_type) {}
+        buffer_pool_manager_(std::move(buffer_pool_manager)) {}
 
   virtual ~IndexEngine() = default;
 

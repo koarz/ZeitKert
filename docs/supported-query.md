@@ -28,7 +28,9 @@ select column1, column2, * from table;
 # Insert
 1. Insert Into Table With Tuples
 2. Insert Into Table Select ...
+3. Bulk Insert (Generate Test Data)
 ```sql
 insert into table values(tuple...);
 insert into table select column from table;
+insert into table bulk 1000;
 ```

@@ -38,8 +38,24 @@ public:
       : max_level_(max_level), compere_(compere),
         root_(std::make_shared<SkipListNode<Key, Value>>(max_level_)){};
 
-  ~SkipList() = default;
+  ~SkipList() { Clear(); }
 
+private:
+  void Clear() {
+    if (!root_) {
+      return;
+    }
+    auto current = *root_->next_.rbegin();
+    root_->next_.clear();
+    while (current) {
+      auto next = *current->next_.rbegin();
+      current->next_.clear();
+      current = std::move(next);
+    }
+    root_.reset();
+  }
+
+public:
   class Iterator {
     std::shared_ptr<SkipListNode<Key, Value>> node_;
 
