@@ -172,25 +172,26 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   bool recover{};
   std::unique_lock lock(latch_);
   auto size = memtable_->GetApproximateSize();
-  // MemTable 到达阈值后转不可变并刷盘
-  if (size >= DEFAULT_ROWGROUP_TARGET_SIZE) {
+  // MemTable 到达 SSTable 大小后转不可变
+  if (size >= SSTABLE_SIZE) {
     std::unique_lock lock(immutable_latch_);
     memtable_->ToImmutable();
     immutable_table_.push_back(std::move(memtable_));
-    auto max_immutable =
-        std::max<size_t>(1, SSTABLE_SIZE / DEFAULT_ROWGROUP_TARGET_SIZE);
-    if (immutable_table_.size() == max_immutable) {
+    if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
+      // 缓冲区满，刷最老的 immutable 为 SSTable
+      std::vector<MemTableRef> to_flush;
+      to_flush.push_back(std::move(immutable_table_.front()));
+      immutable_table_.erase(immutable_table_.begin());
       auto sstable_id = table_number_;
       auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
       table_meta->sstable_id_ = sstable_id;
       auto s = TableOperator::BuildSSTable(column_path_, table_number_,
-                                           immutable_table_, column_types_,
+                                           to_flush, column_types_,
                                            primary_key_idx_, table_meta);
       if (!s.ok()) {
         return s;
       }
       recover = true;
-      immutable_table_.clear();
     }
     memtable_ = std::make_unique<MemTable>(column_path_, write_log_, recover);
   }

@@ -11,11 +11,11 @@
 #include <memory>
 
 namespace DB {
-// the skip list time complexity is log(n) every memtable size approximate 4MB
+// the skip list time complexity is log(n) every memtable size approximate 64MB
 // if just int value the key size + value size + length size is large than 12
-// byes so the data num must less than 500'000 for every memtable
-// log(500'000) about equal 19, so 8 level is big enough
-constexpr size_t DEFAULT_SKIP_LIST_LEVEL = 8;
+// bytes so the data num must less than 5'600'000 for every memtable
+// log(5'600'000) about equal 22.4, so 24 level is big enough
+constexpr size_t DEFAULT_SKIP_LIST_LEVEL = 24;
 
 class MemTable {
   WAL wal_;

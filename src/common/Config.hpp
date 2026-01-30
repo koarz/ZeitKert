@@ -21,12 +21,15 @@ constexpr size_t DEFAULT_PAGE_SIZE = 4096;
 constexpr size_t DEFAULT_POOL_SIZE = 128;
 constexpr size_t DEFAULT_ROWGROUP_TARGET_SIZE = 64 * 1024;
 constexpr size_t DEFAULT_ROWGROUP_ALIGNMENT = 4096;
+constexpr size_t MAX_IMMUTABLE_COUNT = 2;
 #else
-// per sstable size is 8MB
-constexpr uint32_t SSTABLE_SIZE = 8 * 1024 * 1024;
+// per sstable size is 64MB
+constexpr uint32_t SSTABLE_SIZE = 64 * 1024 * 1024;
 constexpr size_t DEFAULT_PAGE_SIZE = 4096;
 constexpr size_t DEFAULT_POOL_SIZE = 4096;
-constexpr size_t DEFAULT_ROWGROUP_TARGET_SIZE = 256 * 1024;
+// per rowgroup size is 16MB
+constexpr size_t DEFAULT_ROWGROUP_TARGET_SIZE = 16 * 1024 * 1024;
 constexpr size_t DEFAULT_ROWGROUP_ALIGNMENT = 4096;
+constexpr size_t MAX_IMMUTABLE_COUNT = 4;
 #endif
 constexpr size_t ZONE_MAP_PREFIX_LEN = 32;
