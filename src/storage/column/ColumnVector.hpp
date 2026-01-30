@@ -13,35 +13,33 @@ public:
   bool IsConstColumn() override { return false; }
   bool IsNullable() override { return true; }
 
-  void Insert(T v) {
-    element_str_.push_back(std::to_string(v));
-    if (element_str_.rbegin()->size() > max_element_size_) {
-      max_element_size_ = element_str_.rbegin()->size();
-    }
-    data_.push_back(v);
+  void Reserve(size_t n) { data_.reserve(n); }
+
+  void InsertBulk(const T *data, size_t count) {
+    data_.insert(data_.end(), data, data + count);
   }
+
+  void Insert(T v) { data_.push_back(v); }
 
   std::string GetStrElement(size_t idx) override {
     if (idx >= data_.size()) {
       return "Null";
     }
-    return element_str_[idx];
+    return std::to_string(data_[idx]);
   }
 
   size_t Size() override { return data_.size(); }
 
   size_t GetMaxElementSize() override {
-    // 4 is Null
-    return std::max(max_element_size_, 4UL);
+    // 4 is "Null"
+    return 4;
   }
 
   T &operator[](size_t idx) { return data_[idx]; }
 
+  const std::vector<T> &Data() const { return data_; }
+
 private:
-  size_t max_element_size_{};
-
   std::vector<T> data_;
-
-  std::vector<std::string> element_str_;
 };
 } // namespace DB

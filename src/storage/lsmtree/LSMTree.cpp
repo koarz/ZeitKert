@@ -5,13 +5,12 @@
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
 #include "storage/lsmtree/BloomFilter.hpp"
+#include "storage/lsmtree/ColumnReader.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/RowCodec.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/TableOperator.hpp"
 #include "storage/lsmtree/iterator/MemTableIterator.hpp"
-#include "storage/lsmtree/iterator/MergeIterator.hpp"
-#include "storage/lsmtree/iterator/SSTableIterator.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -287,99 +286,75 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
   if (column_idx >= column_types_.size()) {
     return Status::Error(ErrorCode::NotFound, "Column index out of range");
   }
+
+  auto type = column_types_[column_idx];
+
+  // 创建列容器
+  switch (type->GetType()) {
+  case ValueType::Type::Int: res = std::make_shared<ColumnVector<int>>(); break;
+  case ValueType::Type::String: res = std::make_shared<ColumnString>(); break;
+  case ValueType::Type::Double:
+    res = std::make_shared<ColumnVector<double>>();
+    break;
+  case ValueType::Type::Null: return Status::OK();
+  }
+
   std::shared_lock lock1(latch_), lock2(immutable_latch_);
-  std::vector<std::shared_ptr<Iterator>> iters;
-  // 合并 memtable 与 sstable 迭代器
-  auto mem_iter =
-      std::make_shared<MemTableIterator>(memtable_->MakeNewIterator());
-  if (mem_iter->Valid()) {
-    iters.push_back(mem_iter);
-  }
+
+  // 1. 从 MemTable 读取（仍需迭代，行存结构无法直接列读取）
+  auto scan_memtable = [&](const MemTableRef &mt) {
+    auto iter = mt->MakeNewIterator();
+    MemTableIterator mem_iter(std::move(iter));
+    while (mem_iter.Valid()) {
+      if (mem_iter.GetValue().Size() == 0) {
+        mem_iter.Next();
+        continue;
+      }
+      Slice val;
+      if (!RowCodec::DecodeColumn(mem_iter.GetValue(), column_idx, &val)) {
+        mem_iter.Next();
+        continue;
+      }
+      switch (type->GetType()) {
+      case ValueType::Type::Int: {
+        if (val.Size() == sizeof(int)) {
+          int v = 0;
+          std::memcpy(&v, val.GetData(), sizeof(int));
+          static_cast<ColumnVector<int> *>(res.get())->Insert(v);
+        }
+        break;
+      }
+      case ValueType::Type::Double: {
+        if (val.Size() == sizeof(double)) {
+          double v = 0.0;
+          std::memcpy(&v, val.GetData(), sizeof(double));
+          static_cast<ColumnVector<double> *>(res.get())->Insert(v);
+        }
+        break;
+      }
+      case ValueType::Type::String: {
+        static_cast<ColumnString *>(res.get())->Insert(val.ToString());
+        break;
+      }
+      case ValueType::Type::Null: break;
+      }
+      mem_iter.Next();
+    }
+  };
+
+  scan_memtable(memtable_);
+
+  // 2. 从 Immutable Tables 读取（仍需迭代）
   for (auto it = immutable_table_.rbegin(); it != immutable_table_.rend();
-       it++) {
-    iters.push_back(
-        std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
+       ++it) {
+    scan_memtable(*it);
   }
-  for (int i = static_cast<int>(table_number_) - 1; i >= 0; i--) {
-    auto it = sstables_.find(i);
-    if (it == sstables_.end()) {
-      continue;
-    }
-    iters.push_back(
-        std::make_shared<SSTableIterator>(it->second, column_types_));
+
+  // 3. 从 SSTable 直接批量读取（利用 PAX 列布局）
+  for (auto &[id, sstable] : sstables_) {
+    ColumnReader::ReadColumnFromSSTable(sstable, column_idx, type, res);
   }
-  if (iters.empty()) {
-    switch (column_types_[column_idx]->GetType()) {
-    case ValueType::Type::Int:
-      res = std::make_shared<ColumnVector<int>>();
-      break;
-    case ValueType::Type::String: res = std::make_shared<ColumnString>(); break;
-    case ValueType::Type::Double:
-      res = std::make_shared<ColumnVector<double>>();
-      break;
-    case ValueType::Type::Null: break;
-    }
-    return Status::OK();
-  }
-  MergeIterator it(std::move(iters));
-  // 扫描时按列解码行数据
-  switch (column_types_[column_idx]->GetType()) {
-  case ValueType::Type::Int: {
-    auto col = std::make_shared<ColumnVector<int>>();
-    while (it.Valid()) {
-      if (it.GetValue().Size() == 0) {
-        it.Next();
-        continue;
-      }
-      Slice val;
-      if (RowCodec::DecodeColumn(it.GetValue(), column_idx, &val) &&
-          val.Size() == sizeof(int)) {
-        int v = 0;
-        std::memcpy(&v, val.GetData(), sizeof(int));
-        col->Insert(v);
-      }
-      it.Next();
-    }
-    res = col;
-    break;
-  }
-  case ValueType::Type::String: {
-    auto col = std::make_shared<ColumnString>();
-    while (it.Valid()) {
-      if (it.GetValue().Size() == 0) {
-        it.Next();
-        continue;
-      }
-      Slice val;
-      if (RowCodec::DecodeColumn(it.GetValue(), column_idx, &val)) {
-        col->Insert(val.ToString());
-      }
-      it.Next();
-    }
-    res = col;
-    break;
-  }
-  case ValueType::Type::Double: {
-    auto col = std::make_shared<ColumnVector<double>>();
-    while (it.Valid()) {
-      if (it.GetValue().Size() == 0) {
-        it.Next();
-        continue;
-      }
-      Slice val;
-      if (RowCodec::DecodeColumn(it.GetValue(), column_idx, &val) &&
-          val.Size() == sizeof(double)) {
-        double v = 0.0;
-        std::memcpy(&v, val.GetData(), sizeof(double));
-        col->Insert(v);
-      }
-      it.Next();
-    }
-    res = col;
-    break;
-  }
-  case ValueType::Type::Null: break;
-  }
+
   return Status::OK();
 }
 } // namespace DB
