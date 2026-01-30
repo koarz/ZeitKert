@@ -5,6 +5,7 @@
 #include "function/FunctionCast.hpp"
 #include "function/FunctionCount.hpp"
 #include "function/FunctionString.hpp"
+#include "function/FunctionSum.hpp"
 #include "parser/Checker.hpp"
 #include "parser/statement/CreateStatement.hpp"
 #include "parser/statement/DropStatement.hpp"
@@ -47,6 +48,7 @@ static void RegisterChecker() {
   Checker::RegisterFunction("ABS", std::make_shared<FunctionAbs>());
   Checker::RegisterFunction("CAST", std::make_shared<FunctionCast>());
   Checker::RegisterFunction("COUNT", std::make_shared<FunctionCount>());
+  Checker::RegisterFunction("SUM", std::make_shared<FunctionSum>());
   Checker::RegisterFunction("TO_UPPER", std::make_shared<FunctionToUpper>());
   Checker::RegisterFunction("TO_LOWER", std::make_shared<FunctionToLower>());
 }
