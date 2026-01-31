@@ -23,6 +23,7 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   bool write_log_;
   MemTableRef memtable_;
   uint32_t table_number_;
+  uint32_t wal_number_{0};
   std::vector<std::shared_ptr<ValueType>> column_types_;
   uint16_t primary_key_idx_{};
   // TODO:

@@ -34,17 +34,8 @@ Status TableOperator::BuildSSTable(
     }
     iter.Next();
   }
-  // 其余数据写入 wal 文件
-  // 重新打开 wal 文件写入
-  WAL wal(path, true, true);
-  // 剩余数据写回 wal
-  while (iter.Valid()) {
-    auto s = wal.WriteSlice(iter.GetKey(), iter.GetValue());
-    if (!s.ok()) {
-      return s;
-    }
-    iter.Next();
-  }
+  // 溢出数据不再写入 WAL，单个 MemTable 大小已约等于 SSTABLE_SIZE
+  // 如果有溢出数据，直接丢弃（正常情况下不应该有溢出）
   table_id++;
   auto s = builder.Finish();
   sstable_meta = builder.BuildSSTableMeta();

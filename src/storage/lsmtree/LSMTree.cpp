@@ -1,6 +1,7 @@
 #include "storage/lsmtree/LSMTree.hpp"
 #include "common/Config.hpp"
 #include "common/Status.hpp"
+#include "fmt/format.h"
 #include "storage/column/Column.hpp"
 #include "storage/column/ColumnString.hpp"
 #include "storage/column/ColumnVector.hpp"
@@ -123,6 +124,12 @@ static bool FindRowIndex(const Byte *base, const RowGroupMeta &rg,
   return false;
 }
 
+// 根据 id 生成 WAL 文件路径
+static std::filesystem::path MakeWalPath(const std::filesystem::path &base,
+                                         uint32_t id) {
+  return base / fmt::format("{}.wal", id);
+}
+
 LSMTree::LSMTree(std::filesystem::path table_path,
                  std::shared_ptr<BufferPoolManager> buffer_pool_manager,
                  std::vector<std::shared_ptr<ValueType>> column_types,
@@ -130,40 +137,56 @@ LSMTree::LSMTree(std::filesystem::path table_path,
     : IndexEngine(SliceCompare{}, std::move(table_path),
                   std::move(buffer_pool_manager)),
       write_log_(write_log), table_number_(0),
-      column_types_(std::move(column_types)), primary_key_idx_(primary_key_idx),
-      memtable_(std::make_unique<MemTable>(column_path_, write_log_)) {
+      column_types_(std::move(column_types)),
+      primary_key_idx_(primary_key_idx) {
   if (column_types_.empty()) {
     primary_key_idx_ = 0;
   } else if (primary_key_idx_ >= column_types_.size()) {
     primary_key_idx_ = 0;
   }
   if (std::filesystem::exists(column_path_)) {
+    // 扫描目录中的 .sst 和 .wal 文件
     for (const auto &entry :
          std::filesystem::directory_iterator(column_path_)) {
       if (!entry.is_regular_file()) {
         continue;
       }
-      if (entry.path().extension() != ".sst") {
-        continue;
+      if (entry.path().extension() == ".sst") {
+        auto stem = entry.path().stem().string();
+        uint32_t id = 0;
+        try {
+          id = static_cast<uint32_t>(std::stoul(stem));
+        } catch (...) {
+          continue;
+        }
+        table_number_ = std::max(table_number_, id + 1);
+        auto &table_meta = sstables_[id] = std::make_shared<SSTable>();
+        table_meta->sstable_id_ = id;
+        std::ignore = TableOperator::ReadSSTable(
+            column_path_, table_meta, column_types_, buffer_pool_manager_);
+      } else if (entry.path().extension() == ".wal") {
+        // 恢复 WAL 文件到 immutable 表
+        auto stem = entry.path().stem().string();
+        uint32_t id = 0;
+        try {
+          id = static_cast<uint32_t>(std::stoul(stem));
+        } catch (...) {
+          continue;
+        }
+        wal_number_ = std::max(wal_number_, id + 1);
+        auto mem = std::make_unique<MemTable>(entry.path(), write_log_, true);
+        mem->ToImmutable();
+        immutable_table_.push_back(std::move(mem));
       }
-      auto stem = entry.path().stem().string();
-      uint32_t id = 0;
-      try {
-        id = static_cast<uint32_t>(std::stoul(stem));
-      } catch (...) {
-        continue;
-      }
-      table_number_ = std::max(table_number_, id + 1);
-      auto &table_meta = sstables_[id] = std::make_shared<SSTable>();
-      table_meta->sstable_id_ = id;
-      std::ignore = TableOperator::ReadSSTable(
-          column_path_, table_meta, column_types_, buffer_pool_manager_);
     }
   }
+  // 创建新的 memtable，使用新的 WAL 序号
+  memtable_ = std::make_unique<MemTable>(
+      MakeWalPath(column_path_, wal_number_++), write_log_, false);
 }
 
 LSMTree::~LSMTree() {
-  // 逐个刷盘所有 immutable tables
+  // 逐个刷盘所有 immutable tables，并删除对应的 WAL 文件
   while (!immutable_table_.empty()) {
     std::vector<MemTableRef> to_flush;
     to_flush.push_back(std::move(immutable_table_.front()));
@@ -173,6 +196,10 @@ LSMTree::~LSMTree() {
     std::ignore = TableOperator::BuildSSTable(column_path_, table_number_,
                                               to_flush, column_types_,
                                               primary_key_idx_, table_meta);
+    // 刷盘后删除 WAL 文件
+    for (auto &mem : to_flush) {
+      mem->DeleteWal();
+    }
   }
 }
 
@@ -182,7 +209,6 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
         ErrorCode::InsertError,
         "Your row data too large, please split it to less than 64MB");
   }
-  bool recover{};
   std::unique_lock lock(latch_);
   auto size = memtable_->GetApproximateSize();
   // MemTable 到达 SSTable 大小后转不可变
@@ -204,9 +230,14 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
       if (!s.ok()) {
         return s;
       }
-      recover = true;
+      // 刷盘后删除 WAL 文件
+      for (auto &mem : to_flush) {
+        mem->DeleteWal();
+      }
     }
-    memtable_ = std::make_unique<MemTable>(column_path_, write_log_, recover);
+    // 创建新的 memtable，使用新的 WAL 序号
+    memtable_ = std::make_unique<MemTable>(
+        MakeWalPath(column_path_, wal_number_++), write_log_, false);
   }
   return memtable_->Put(key, value);
 }

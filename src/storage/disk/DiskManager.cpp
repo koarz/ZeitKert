@@ -40,11 +40,10 @@ Status DiskManager::DropDatabase(std::string &name) {
 
 Status DiskManager::DropTable(std::filesystem::path table_path) {
   try {
+    // remove_all 会删除目录及其中所有文件（包括 .wal 和 .sst）
     if (!std::filesystem::remove_all(table_path)) {
       return Status::Error(ErrorCode::DropError, "The Table can't be dropped");
     }
-    auto wal_path = std::filesystem::path(table_path).concat(".wal");
-    std::filesystem::remove(wal_path);
   } catch (const std::filesystem::filesystem_error &e) {
     return Status::Error(ErrorCode::DropError,
                          std::format("Error drop table: {}", e.what()));
