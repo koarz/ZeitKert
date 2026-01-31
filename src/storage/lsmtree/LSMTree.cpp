@@ -162,6 +162,25 @@ LSMTree::LSMTree(std::filesystem::path table_path,
   }
 }
 
+LSMTree::~LSMTree() {
+  // 将当前 memtable 加入刷盘队列
+  if (memtable_ && memtable_->GetApproximateSize() > 0) {
+    memtable_->ToImmutable();
+    immutable_table_.push_back(std::move(memtable_));
+  }
+  // 逐个刷盘所有 immutable tables
+  while (!immutable_table_.empty()) {
+    std::vector<MemTableRef> to_flush;
+    to_flush.push_back(std::move(immutable_table_.front()));
+    immutable_table_.erase(immutable_table_.begin());
+    auto &table_meta = sstables_[table_number_] = std::make_shared<SSTable>();
+    table_meta->sstable_id_ = table_number_;
+    std::ignore = TableOperator::BuildSSTable(column_path_, table_number_,
+                                              to_flush, column_types_,
+                                              primary_key_idx_, table_meta);
+  }
+}
+
 Status LSMTree::Insert(const Slice &key, const Slice &value) {
   if (value.Size() > SSTABLE_SIZE) {
     return Status::Error(

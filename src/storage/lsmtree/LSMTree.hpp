@@ -37,7 +37,7 @@ public:
           std::vector<std::shared_ptr<ValueType>> column_types,
           uint16_t primary_key_idx, bool write_log = true);
 
-  ~LSMTree() override = default;
+  ~LSMTree() override;
 
   Status Insert(const Slice &key, const Slice &value) override;
 
