@@ -72,6 +72,7 @@ Status ZeitKert::HandleDropStatement() {
                            "You have not choice a database");
     }
     table_path = context_->database_->GetPath() / name;
+    context_->lsm_trees_.erase(name);
     status = context_->disk_manager_->DropTable(table_path);
     context_->database_->RemoveTable(name);
     break;
