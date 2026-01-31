@@ -163,11 +163,6 @@ LSMTree::LSMTree(std::filesystem::path table_path,
 }
 
 LSMTree::~LSMTree() {
-  // 将当前 memtable 加入刷盘队列
-  if (memtable_ && memtable_->GetApproximateSize() > 0) {
-    memtable_->ToImmutable();
-    immutable_table_.push_back(std::move(memtable_));
-  }
   // 逐个刷盘所有 immutable tables
   while (!immutable_table_.empty()) {
     std::vector<MemTableRef> to_flush;
