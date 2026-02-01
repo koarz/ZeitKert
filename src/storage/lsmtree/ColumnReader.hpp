@@ -3,6 +3,7 @@
 #include "storage/column/Column.hpp"
 #include "storage/lsmtree/RowGroupMeta.hpp"
 #include "storage/lsmtree/SSTable.hpp"
+#include "storage/lsmtree/SelectionVector.hpp"
 #include "type/ValueType.hpp"
 
 #include <cstddef>
@@ -23,6 +24,13 @@ public:
   static void ReadColumnFromSSTable(const SSTableRef &sstable, size_t col_idx,
                                     const std::shared_ptr<ValueType> &type,
                                     ColumnPtr &column);
+
+  // 从 RowGroup 读取指定行（根据 RowGroupSelection）
+  static void ReadColumnWithSelection(const RowGroupMeta &rg, const Byte *base,
+                                      size_t col_idx,
+                                      const std::shared_ptr<ValueType> &type,
+                                      const RowGroupSelection &sel,
+                                      ColumnPtr &column);
 };
 
 } // namespace DB

@@ -62,4 +62,61 @@ void ColumnReader::ReadColumnFromSSTable(const SSTableRef &sstable,
   }
 }
 
+void ColumnReader::ReadColumnWithSelection(
+    const RowGroupMeta &rg, const Byte *base, size_t col_idx,
+    const std::shared_ptr<ValueType> &type, const RowGroupSelection &sel,
+    ColumnPtr &column) {
+  if (rg.row_count == 0 || col_idx >= rg.columns.size()) {
+    return;
+  }
+
+  // 连续区间且覆盖整个 RowGroup，走快速路径
+  if (sel.IsContiguous() && sel.start_row == 0 && sel.count == rg.row_count) {
+    ReadColumnFromRowGroup(rg, base, col_idx, type, column);
+    return;
+  }
+
+  const auto &col = rg.columns[col_idx];
+  const Byte *col_data = base + col.offset;
+
+  // 获取需要读取的行索引列表
+  auto read_row = [&](uint32_t row_idx) {
+    switch (type->GetType()) {
+    case ValueType::Type::Int: {
+      int v = 0;
+      std::memcpy(&v, col_data + row_idx * sizeof(int), sizeof(int));
+      static_cast<ColumnVector<int> *>(column.get())->Insert(v);
+      break;
+    }
+    case ValueType::Type::Double: {
+      double v = 0.0;
+      std::memcpy(&v, col_data + row_idx * sizeof(double), sizeof(double));
+      static_cast<ColumnVector<double> *>(column.get())->Insert(v);
+      break;
+    }
+    case ValueType::Type::String: {
+      const uint32_t *offsets = reinterpret_cast<const uint32_t *>(col_data);
+      const char *str_data =
+          reinterpret_cast<const char *>(offsets + rg.row_count + 1);
+      uint32_t start = offsets[row_idx];
+      uint32_t end = offsets[row_idx + 1];
+      static_cast<ColumnString *>(column.get())
+          ->Insert(std::string(str_data + start, end - start));
+      break;
+    }
+    case ValueType::Type::Null: break;
+    }
+  };
+
+  if (sel.IsContiguous()) {
+    for (uint32_t i = 0; i < sel.count; i++) {
+      read_row(sel.start_row + i);
+    }
+  } else {
+    for (uint32_t idx : sel.rows) {
+      read_row(idx);
+    }
+  }
+}
+
 } // namespace DB

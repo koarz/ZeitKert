@@ -5,6 +5,7 @@
 #include "storage/column/Column.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SSTable.hpp"
+#include "storage/lsmtree/SelectionVector.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/TableOperator.hpp"
 #include "type/ValueType.hpp"
@@ -47,6 +48,9 @@ public:
   Status GetValue(const Slice &key, Slice *column) override;
 
   Status ScanColumn(size_t column_idx, ColumnPtr &res);
+
+  // 构建去重后的 SelectionVector
+  SelectionVector BuildSelectionVector();
 
   size_t GetImmutableSize() { return immutable_table_.size(); }
 
