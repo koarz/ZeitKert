@@ -600,7 +600,7 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
       key_locations.begin(), key_locations.end(),
       [](const IntKeyLoc &a, const IntKeyLoc &b) { return a.key < b.key; });
 
-  // 去重并分组
+  // 去重并分组（逆序遍历取每个 key 的最新版本）
   std::vector<int> mem_keys;
   mem_keys.reserve(key_locations.size());
 
@@ -609,7 +609,8 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
 
   int last_key = 0;
   bool first = true;
-  for (const auto &loc : key_locations) {
+  for (size_t i = key_locations.size(); i > 0; --i) {
+    const auto &loc = key_locations[i - 1];
     if (first || loc.key != last_key) {
       mem_keys.push_back(loc.key);
       if (loc.source == DataSource::MemTable) {
@@ -620,6 +621,13 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
       last_key = loc.key;
       first = false;
     }
+  }
+
+  // 逆序收集的，需要反转恢复正序
+  std::reverse(mem_keys.begin(), mem_keys.end());
+  std::reverse(memtable_rows.begin(), memtable_rows.end());
+  for (auto &rows : immutable_rows) {
+    std::reverse(rows.begin(), rows.end());
   }
 
   // 批量添加
@@ -816,7 +824,8 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
 
   KeyRef last_key{nullptr, 0};
   bool first = true;
-  for (const auto &loc : key_locations) {
+  for (size_t i = key_locations.size(); i > 0; --i) {
+    const auto &loc = key_locations[i - 1];
     if (first || !(loc.key == last_key)) {
       mem_keys.push_back(loc.key);
       if (loc.source == DataSource::MemTable) {
@@ -827,6 +836,13 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
       last_key = loc.key;
       first = false;
     }
+  }
+
+  // 逆序收集的，需要反转恢复正序
+  std::reverse(mem_keys.begin(), mem_keys.end());
+  std::reverse(memtable_rows.begin(), memtable_rows.end());
+  for (auto &rows : immutable_rows) {
+    std::reverse(rows.begin(), rows.end());
   }
 
   if (!memtable_rows.empty()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "execution/AbstractExecutor.hpp"
+#include "execution/FilterExecutor.hpp"
 #include "execution/FunctionExecutor.hpp"
 #include "execution/InsertExecutor.hpp"
 #include "execution/ProjectionExecutor.hpp"
@@ -8,6 +9,7 @@
 #include "execution/TupleExecutor.hpp"
 #include "execution/ValuesExecutor.hpp"
 #include "planner/AbstractPlanNode.hpp"
+#include "planner/FilterPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
 #include "planner/InsertPlanNode.hpp"
 #include "planner/ProjectionPlanNode.hpp"
@@ -70,6 +72,16 @@ struct ExecutorFactory {
           p.GetSchemaRef(), p.GetColumnMeta(), p.GetLSMTree(),
           p.GetColumnIndex());
     }
+    case PlanType::Filter: {
+      auto &p = static_cast<FilterPlanNode &>(*plan);
+      std::vector<AbstractExecutorRef> children;
+      for (auto child : p.GetChildren()) {
+        children.push_back(CreateExecutor(child));
+      }
+      return std::make_unique<FilterExecutor>(
+          p.GetSchemaRef(), std::move(children), p.GetCondition(),
+          p.GetConditionColumns());
+    }
     case PlanType::IndexScan:
     case PlanType::Update:
     case PlanType::Delete:
@@ -78,7 +90,6 @@ struct ExecutorFactory {
     case PlanType::NestedLoopJoin:
     case PlanType::NestedIndexJoin:
     case PlanType::HashJoin:
-    case PlanType::Filter:
     case PlanType::Sort:
     case PlanType::TopN:
     case PlanType::MockScan:

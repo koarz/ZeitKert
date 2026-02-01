@@ -109,10 +109,19 @@ private:
 
   static int GetBinaryPrecedence(TokenType type);
 
+  static bool IsLogicalOperator(const Token &token);
+
+  static int GetBinaryPrecedenceForToken(const Token &token);
+
   static BoundExpressRef CreateArithmeticFunction(TokenType op_type,
                                                   BoundExpressRef lhs,
                                                   BoundExpressRef rhs,
                                                   std::string &message);
+
+  static BoundExpressRef CreateLogicalFunction(const std::string &op_word,
+                                               BoundExpressRef lhs,
+                                               BoundExpressRef rhs,
+                                               std::string &message);
 
   static std::shared_ptr<ValueType>
   GetExpressType(const BoundExpressRef &express);

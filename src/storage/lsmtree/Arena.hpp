@@ -20,12 +20,12 @@ namespace DB {
  * MemTable 最大为 64MB (SSTABLE_SIZE)，所以最多扩容 10 次。
  */
 class Arena {
-  static constexpr size_t kInitialCapacity = 64 * 1024;  // 64KB 初始容量
+  static constexpr size_t kInitialCapacity = 64 * 1024; // 64KB 初始容量
   static constexpr size_t kGrowthFactor = 2;
 
   std::unique_ptr<Byte[]> data_;
   size_t capacity_{0};
-  size_t size_{0};  // 当前已使用的字节数
+  size_t size_{0}; // 当前已使用的字节数
 
   void Grow(size_t min_capacity) {
     size_t new_capacity = capacity_ == 0 ? kInitialCapacity : capacity_;
@@ -111,4 +111,4 @@ public:
   void Reset() { size_ = 0; }
 };
 
-}  // namespace DB
+} // namespace DB

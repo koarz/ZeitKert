@@ -167,14 +167,33 @@ Status Parser::ParseSelect(TokenIterator &iterator) {
   tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
   if (have_from) {
     std::vector<std::string> names;
+    std::optional<TokenIterator> where_begin;
+    std::optional<TokenIterator> where_end;
+    bool have_where = false;
+
     while (!(++iterator)->isEnd()) {
       if (iterator->type == TokenType::Comma) {
         continue;
+      }
+      std::string s{iterator->begin, iterator->end};
+      if (Checker::IsKeyWord(s) && s == "WHERE") {
+        have_where = true;
+        where_begin = ++iterator;
+        // 收集 WHERE 后面的所有 token
+        while (!(++iterator)->isEnd()) {}
+        where_end = iterator;
+        break;
       }
       names.emplace_back(iterator->begin, iterator->end);
     }
     tree_->children_.emplace_back(
         std::make_shared<TableNames>(std::move(names)));
+
+    // 添加 WHERE 子句的 token（如果存在）
+    if (have_where && where_begin.has_value()) {
+      tree_->children_.emplace_back(
+          std::make_shared<ASTToken>(where_begin, where_end));
+    }
   }
   return Status::OK();
 }

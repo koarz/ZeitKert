@@ -43,6 +43,20 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
   }
 
   res->columns_ = std::move(columns);
+
+  // 处理 WHERE 子句
+  if (select_query.children_.size() > 2) {
+    auto &where_token = static_cast<ASTToken &>(*select_query.children_[2]);
+    auto where_it = where_token.Begin();
+    std::vector<BoundExpressRef> dummy_columns;
+    auto where_expr = ParseExpression(where_it, where_token.End(), res->from_,
+                                      dummy_columns, message);
+    if (!message.empty()) {
+      return nullptr;
+    }
+    res->where_condition_ = where_expr;
+  }
+
   return res;
 }
 } // namespace DB

@@ -33,6 +33,68 @@ SELECT COUNT(uid) FROM users
 ----
 3
 
+# WHERE 基本比较测试
+query
+SELECT * FROM users WHERE uid = 1
+----
+1 Alice
+
+query
+SELECT * FROM users WHERE uid > 1
+----
+2 Bob
+3 Charlie
+
+query
+SELECT * FROM users WHERE uid >= 2
+----
+2 Bob
+3 Charlie
+
+query
+SELECT * FROM users WHERE uid < 3
+----
+1 Alice
+2 Bob
+
+query
+SELECT * FROM users WHERE uid != 2
+----
+1 Alice
+3 Charlie
+
+# WHERE 字符串比较测试
+query
+SELECT * FROM users WHERE name = 'Bob'
+----
+2 Bob
+
+# WHERE AND 逻辑组合测试
+query
+SELECT * FROM users WHERE uid > 1 AND uid < 3
+----
+2 Bob
+
+# WHERE OR 逻辑组合测试
+query
+SELECT * FROM users WHERE uid = 1 OR uid = 3
+----
+1 Alice
+3 Charlie
+
+# WHERE 复合逻辑测试
+query
+SELECT * FROM users WHERE uid = 1 OR uid = 2 AND name = 'Bob'
+----
+1 Alice
+2 Bob
+
+# WHERE 聚合函数测试
+query
+SELECT COUNT(uid) FROM users WHERE uid > 1
+----
+2
+
 # Unique key测试 - 插入重复uid应该更新
 statement ok
 INSERT INTO users VALUES (1, 'Alice Updated')

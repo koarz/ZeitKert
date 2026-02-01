@@ -38,6 +38,7 @@ static void RegisterChecker() {
   Checker::RegisterKeyWord("VALUES");
   Checker::RegisterKeyWord("BULK");
   Checker::RegisterKeyWord("FROM");
+  Checker::RegisterKeyWord("WHERE");
   Checker::RegisterKeyWord("UNIQUE");
   Checker::RegisterKeyWord("KEY");
 

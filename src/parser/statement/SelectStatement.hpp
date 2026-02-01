@@ -15,5 +15,8 @@ struct SelectStatement : public SQLStatement {
   std::vector<BoundExpressRef> columns_;
 
   std::vector<TableMetaRef> from_;
+
+  // WHERE 条件表达式，为 nullptr 表示没有 WHERE 子句
+  BoundExpressRef where_condition_;
 };
 } // namespace DB

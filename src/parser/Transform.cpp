@@ -2,6 +2,8 @@
 #include "common/util/StringUtil.hpp"
 #include "fmt/format.h"
 #include "function/FunctionArithmetic.hpp"
+#include "function/FunctionComparison.hpp"
+#include "function/FunctionLogical.hpp"
 #include "parser/Checker.hpp"
 #include "parser/Lexer.hpp"
 #include "parser/TokenIterator.hpp"
@@ -234,12 +236,41 @@ BoundExpressRef Transform::ParseIdentifier(
 
 int Transform::GetBinaryPrecedence(TokenType type) {
   switch (type) {
+  case TokenType::Equals:
+  case TokenType::NotEquals:
+  case TokenType::Less:
+  case TokenType::Greater:
+  case TokenType::LessOrEquals:
+  case TokenType::GreaterOrEquals: return 2;
   case TokenType::Plus:
-  case TokenType::Minus: return 1;
+  case TokenType::Minus: return 3;
   case TokenType::Asterisk:
-  case TokenType::Slash: return 2;
+  case TokenType::Slash: return 4;
   default: return -1;
   }
+}
+
+// 检查 token 是否是逻辑运算符 AND/OR
+bool Transform::IsLogicalOperator(const Token &token) {
+  if (token.type != TokenType::BareWord) {
+    return false;
+  }
+  std::string word{token.begin, token.end};
+  std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+  return word == "AND" || word == "OR";
+}
+
+// 获取 token 的二元运算符优先级（包括逻辑运算符）
+int Transform::GetBinaryPrecedenceForToken(const Token &token) {
+  if (token.type == TokenType::BareWord) {
+    std::string word{token.begin, token.end};
+    std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+    if (word == "OR")
+      return 0; // 最低优先级
+    if (word == "AND")
+      return 1; // 次低优先级
+  }
+  return GetBinaryPrecedence(token.type);
 }
 
 std::shared_ptr<ValueType>
@@ -290,16 +321,43 @@ BoundExpressRef Transform::CreateArithmeticFunction(TokenType op_type,
                                                     BoundExpressRef lhs,
                                                     BoundExpressRef rhs,
                                                     std::string &message) {
-  auto result_type = DeduceNumericType(lhs, rhs, message);
-  if (!message.empty() || result_type == nullptr) {
-    return nullptr;
-  }
   auto make_args = [&]() {
     std::vector<BoundExpressRef> args;
     args.emplace_back(lhs);
     args.emplace_back(rhs);
     return args;
   };
+
+  // 比较运算符
+  using CmpOp = FunctionComparison::Operator;
+  switch (op_type) {
+  case TokenType::Less:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::Less), make_args());
+  case TokenType::LessOrEquals:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::LessOrEquals), make_args());
+  case TokenType::Greater:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::Greater), make_args());
+  case TokenType::GreaterOrEquals:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::GreaterOrEquals),
+        make_args());
+  case TokenType::Equals:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::Equals), make_args());
+  case TokenType::NotEquals:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionComparison>(CmpOp::NotEquals), make_args());
+  default: break;
+  }
+
+  // 算术运算符
+  auto result_type = DeduceNumericType(lhs, rhs, message);
+  if (!message.empty() || result_type == nullptr) {
+    return nullptr;
+  }
   using Operator = FunctionBinaryArithmetic::Operator;
   switch (op_type) {
   case TokenType::Plus:
@@ -321,6 +379,27 @@ BoundExpressRef Transform::CreateArithmeticFunction(TokenType op_type,
   default:
     message = fmt::format("operator {} not supported", getTokenName(op_type));
   }
+  return nullptr;
+}
+
+BoundExpressRef Transform::CreateLogicalFunction(const std::string &op_word,
+                                                 BoundExpressRef lhs,
+                                                 BoundExpressRef rhs,
+                                                 std::string &message) {
+  std::vector<BoundExpressRef> args;
+  args.emplace_back(lhs);
+  args.emplace_back(rhs);
+
+  using LogicOp = FunctionLogical::Operator;
+  if (op_word == "AND") {
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionLogical>(LogicOp::And), std::move(args));
+  }
+  if (op_word == "OR") {
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionLogical>(LogicOp::Or), std::move(args));
+  }
+  message = fmt::format("unsupported logical operator {}", op_word);
   return nullptr;
 }
 
@@ -398,15 +477,32 @@ Transform::ParseExpression(TokenIterator &it, TokenIterator end,
     if (!(lookahead < end)) {
       break;
     }
-    int precedence = GetBinaryPrecedence(lookahead->type);
+    int precedence = GetBinaryPrecedenceForToken(*lookahead);
     if (precedence < min_precedence) {
       break;
     }
+    // 保存运算符信息
     TokenType op_type = lookahead->type;
+    std::string op_word;
+    bool is_logical = false;
+    if (op_type == TokenType::BareWord) {
+      op_word = std::string{lookahead->begin, lookahead->end};
+      std::transform(op_word.begin(), op_word.end(), op_word.begin(),
+                     ::toupper);
+      is_logical = (op_word == "AND" || op_word == "OR");
+      if (!is_logical) {
+        // BareWord 不是 AND/OR，不是运算符
+        break;
+      }
+    }
     it = lookahead;
     auto rhs_token = it;
     if (!(++rhs_token < end)) {
-      message = fmt::format("operator {} miss rhs", getTokenName(op_type));
+      if (is_logical) {
+        message = fmt::format("operator {} miss rhs", op_word);
+      } else {
+        message = fmt::format("operator {} miss rhs", getTokenName(op_type));
+      }
       return nullptr;
     }
     it = rhs_token;
@@ -415,7 +511,11 @@ Transform::ParseExpression(TokenIterator &it, TokenIterator end,
     if (!right || !message.empty()) {
       return nullptr;
     }
-    left = CreateArithmeticFunction(op_type, left, right, message);
+    if (is_logical) {
+      left = CreateLogicalFunction(op_word, left, right, message);
+    } else {
+      left = CreateArithmeticFunction(op_type, left, right, message);
+    }
     if (!left || !message.empty()) {
       return nullptr;
     }
