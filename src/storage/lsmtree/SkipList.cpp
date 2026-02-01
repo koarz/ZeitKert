@@ -1,6 +1,7 @@
 #include "storage/lsmtree/SkipList.hpp"
 #include "common/Status.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "storage/lsmtree/SliceRef.hpp"
 
 #include <random>
 
@@ -108,4 +109,5 @@ Status SkipList<Key, Value, KeyCompare>::Get(Key key, Value *value) {
 }
 
 template class SkipList<Slice, Slice, SliceCompare>;
+template class SkipList<SliceRef, SliceRef, SliceRefCompare>;
 } // namespace DB

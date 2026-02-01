@@ -65,10 +65,14 @@ public:
       node_ = *node_->next_.rbegin();
       return *this;
     }
-    bool operator!=(Iterator other) { return node_ != other.node_; }
-    bool operator==(Iterator other) { return node_ == other.node_; }
-    std::pair<Key, Value> &operator*() { return node_->kv_; }
-    std::pair<Key, Value> &operator->() { return node_->kv_; }
+    bool operator!=(const Iterator &other) const {
+      return node_ != other.node_;
+    }
+    bool operator==(const Iterator &other) const {
+      return node_ == other.node_;
+    }
+    std::pair<Key, Value> &operator*() const { return node_->kv_; }
+    std::pair<Key, Value> &operator->() const { return node_->kv_; }
   };
 
   template <typename PAIR>

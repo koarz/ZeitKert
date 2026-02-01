@@ -12,7 +12,6 @@
 #include "storage/lsmtree/SelectionVector.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/TableOperator.hpp"
-#include "storage/lsmtree/iterator/MemTableIterator.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -21,6 +20,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -186,19 +186,25 @@ LSMTree::LSMTree(std::filesystem::path table_path,
   // 按 id 排序 WAL 文件
   std::sort(wal_files.begin(), wal_files.end());
 
+  // 获取主键类型
+  auto pk_type = column_types_.empty()
+                     ? ValueType::Type::String
+                     : column_types_[primary_key_idx_]->GetType();
+
   if (wal_files.empty()) {
     // 没有 WAL 文件，创建新的 MemTable
     memtable_ = std::make_unique<MemTable>(
-        MakeWalPath(column_path_, wal_number_++), write_log_, false);
+        MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
   } else {
     // 最后一个 WAL（id 最大）恢复到 MemTable
     auto &[last_id, last_path] = wal_files.back();
-    memtable_ = std::make_unique<MemTable>(last_path, write_log_, true);
+    memtable_ =
+        std::make_unique<MemTable>(last_path, write_log_, pk_type, true);
 
     // 其他 WAL 恢复到 immutable
     for (size_t i = 0; i + 1 < wal_files.size(); i++) {
       auto &[id, path] = wal_files[i];
-      auto mem = std::make_unique<MemTable>(path, write_log_, true);
+      auto mem = std::make_unique<MemTable>(path, write_log_, pk_type, true);
       mem->ToImmutable();
       immutable_table_.push_back(std::move(mem));
     }
@@ -263,8 +269,11 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
       }
     }
     // 创建新的 memtable，使用新的 WAL 序号
+    auto pk_type = column_types_.empty()
+                       ? ValueType::Type::String
+                       : column_types_[primary_key_idx_]->GetType();
     memtable_ = std::make_unique<MemTable>(
-        MakeWalPath(column_path_, wal_number_++), write_log_, false);
+        MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
   }
   return memtable_->Put(key, value);
 }
@@ -376,42 +385,60 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
   // 构建去重后的 SelectionVector
   auto sv = BuildSelectionVector();
 
+  // 预分配容量减少重分配
+  size_t total_rows = sv.TotalRows();
+  switch (type->GetType()) {
+  case ValueType::Type::Int:
+    static_cast<ColumnVector<int> *>(res.get())->Reserve(total_rows);
+    break;
+  case ValueType::Type::Double:
+    static_cast<ColumnVector<double> *>(res.get())->Reserve(total_rows);
+    break;
+  case ValueType::Type::String:
+    static_cast<ColumnString *>(res.get())->Reserve(total_rows);
+    break;
+  case ValueType::Type::Null: break;
+  }
+
   // 按 SelectionVector 读取数据
   for (const auto &sel : sv.GetSelections()) {
     switch (sel.source) {
     case DataSource::MemTable: {
-      // 从 MemTable 按行读取
-      auto iter = memtable_->MakeNewIterator();
-      uint32_t row_idx = 0;
+      // 零拷贝直接访问 Arena
+      auto &impl = memtable_->GetImpl();
       auto read_mem_row = [&](uint32_t target_idx) {
-        while (row_idx < target_idx && iter.Valid()) {
-          iter.Next();
-          row_idx++;
-        }
-        if (!iter.Valid())
+        const Byte *value_ptr = nullptr;
+        uint32_t value_len = 0;
+        if (!impl.GetValueRawByIndex(target_idx, value_ptr, value_len))
           return;
-        Slice val;
-        if (!RowCodec::DecodeColumn(iter.GetValue(), column_idx, &val))
+
+        // 零拷贝解析列
+        const Byte *col_ptr = nullptr;
+        uint32_t col_len = 0;
+        if (!RowCodec::DecodeColumnRaw(value_ptr, value_len, column_idx,
+                                       col_ptr, col_len))
           return;
+
         switch (type->GetType()) {
         case ValueType::Type::Int: {
-          if (val.Size() == sizeof(int)) {
+          if (col_len == sizeof(int)) {
             int v = 0;
-            std::memcpy(&v, val.GetData(), sizeof(int));
+            std::memcpy(&v, col_ptr, sizeof(int));
             static_cast<ColumnVector<int> *>(res.get())->Insert(v);
           }
           break;
         }
         case ValueType::Type::Double: {
-          if (val.Size() == sizeof(double)) {
+          if (col_len == sizeof(double)) {
             double v = 0.0;
-            std::memcpy(&v, val.GetData(), sizeof(double));
+            std::memcpy(&v, col_ptr, sizeof(double));
             static_cast<ColumnVector<double> *>(res.get())->Insert(v);
           }
           break;
         }
         case ValueType::Type::String: {
-          static_cast<ColumnString *>(res.get())->Insert(val.ToString());
+          static_cast<ColumnString *>(res.get())->Insert(
+              std::string(col_ptr, col_len));
           break;
         }
         case ValueType::Type::Null: break;
@@ -430,41 +457,43 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
       break;
     }
     case DataSource::Immutable: {
-      // 从 Immutable Table 按行读取
+      // 零拷贝直接访问 Immutable Arena
       if (sel.source_id >= immutable_table_.size())
         break;
-      auto &imm = immutable_table_[sel.source_id];
-      auto iter = imm->MakeNewIterator();
-      uint32_t row_idx = 0;
+      auto &impl = immutable_table_[sel.source_id]->GetImpl();
+
       auto read_imm_row = [&](uint32_t target_idx) {
-        while (row_idx < target_idx && iter.Valid()) {
-          iter.Next();
-          row_idx++;
-        }
-        if (!iter.Valid())
+        const Byte *value_ptr = nullptr;
+        uint32_t value_len = 0;
+        if (!impl.GetValueRawByIndex(target_idx, value_ptr, value_len))
           return;
-        Slice val;
-        if (!RowCodec::DecodeColumn(iter.GetValue(), column_idx, &val))
+
+        const Byte *col_ptr = nullptr;
+        uint32_t col_len = 0;
+        if (!RowCodec::DecodeColumnRaw(value_ptr, value_len, column_idx,
+                                       col_ptr, col_len))
           return;
+
         switch (type->GetType()) {
         case ValueType::Type::Int: {
-          if (val.Size() == sizeof(int)) {
+          if (col_len == sizeof(int)) {
             int v = 0;
-            std::memcpy(&v, val.GetData(), sizeof(int));
+            std::memcpy(&v, col_ptr, sizeof(int));
             static_cast<ColumnVector<int> *>(res.get())->Insert(v);
           }
           break;
         }
         case ValueType::Type::Double: {
-          if (val.Size() == sizeof(double)) {
+          if (col_len == sizeof(double)) {
             double v = 0.0;
-            std::memcpy(&v, val.GetData(), sizeof(double));
+            std::memcpy(&v, col_ptr, sizeof(double));
             static_cast<ColumnVector<double> *>(res.get())->Insert(v);
           }
           break;
         }
         case ValueType::Type::String: {
-          static_cast<ColumnString *>(res.get())->Insert(val.ToString());
+          static_cast<ColumnString *>(res.get())->Insert(
+              std::string(col_ptr, col_len));
           break;
         }
         case ValueType::Type::Null: break;
@@ -509,160 +538,416 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
 SelectionVector LSMTree::BuildSelectionVector() {
   SelectionVector sv;
 
-  // --- 阶段 1: 收集 MemTable/Immutable 的 key 并记录位置 ---
-  // 使用有序 vector 以支持二分查找，同时记录每个 key 对应的位置信息用于去重
-  struct KeyLocation {
-    std::string key;
+  auto pk_type = column_types_.empty()
+                     ? ValueType::Type::String
+                     : column_types_[primary_key_idx_]->GetType();
+
+  // 根据主键类型分派不同实现
+  switch (pk_type) {
+  case ValueType::Type::Int: return BuildSelectionVectorInt();
+  default: return BuildSelectionVectorString();
+  }
+}
+
+// 整数主键特化：排序时直接比较 int，极度高效
+SelectionVector LSMTree::BuildSelectionVectorInt() {
+  SelectionVector sv;
+
+  struct IntKeyLoc {
+    int key;
     DataSource source;
     uint32_t source_id;
     uint32_t row_idx;
   };
-  std::vector<KeyLocation> key_locations;
 
-  // 1. 扫描 MemTable（最新数据）
+  // 预估容量
+  size_t estimated_count = memtable_->GetImpl().Count();
+  for (auto &imm : immutable_table_) {
+    estimated_count += imm->GetImpl().Count();
+  }
+
+  std::vector<IntKeyLoc> key_locations;
+  key_locations.reserve(estimated_count);
+
+  // 收集 MemTable
   {
-    auto iter = memtable_->MakeNewIterator();
-    uint32_t row_idx = 0;
-    while (iter.Valid()) {
-      if (iter.GetValue().Size() > 0) {
-        key_locations.push_back(
-            {iter.GetKey().ToString(), DataSource::MemTable, 0, row_idx});
-      }
-      iter.Next();
-      row_idx++;
+    const auto &entries = memtable_->GetImpl().GetIntEntries();
+    for (size_t i = 0; i < entries.size(); ++i) {
+      const auto &e = entries[i];
+      if (e.value_len == 0)
+        continue; // 跳过删除
+      key_locations.push_back(
+          {e.key, DataSource::MemTable, 0, static_cast<uint32_t>(i)});
     }
   }
 
-  // 2. 扫描 Immutable Tables（从新到旧）
-  for (size_t i = immutable_table_.size(); i > 0; i--) {
-    auto &imm = immutable_table_[i - 1];
-    auto iter = imm->MakeNewIterator();
-    uint32_t row_idx = 0;
-    while (iter.Valid()) {
-      if (iter.GetValue().Size() > 0) {
-        key_locations.push_back({iter.GetKey().ToString(),
-                                 DataSource::Immutable,
-                                 static_cast<uint32_t>(i - 1), row_idx});
-      }
-      iter.Next();
-      row_idx++;
+  // 收集 Immutable（从新到旧）
+  for (size_t imm_idx = immutable_table_.size(); imm_idx > 0; --imm_idx) {
+    const auto &entries =
+        immutable_table_[imm_idx - 1]->GetImpl().GetIntEntries();
+    for (size_t i = 0; i < entries.size(); ++i) {
+      const auto &e = entries[i];
+      if (e.value_len == 0)
+        continue;
+      key_locations.push_back({e.key, DataSource::Immutable,
+                               static_cast<uint32_t>(imm_idx - 1),
+                               static_cast<uint32_t>(i)});
     }
   }
 
-  // 按 key 排序，相同 key 的保持原顺序（稳定排序），先出现的优先级更高
+  // 排序：直接比较 int，极快！
+  std::stable_sort(
+      key_locations.begin(), key_locations.end(),
+      [](const IntKeyLoc &a, const IntKeyLoc &b) { return a.key < b.key; });
+
+  // 去重并分组
+  std::vector<int> mem_keys;
+  mem_keys.reserve(key_locations.size());
+
+  std::vector<uint32_t> memtable_rows;
+  std::vector<std::vector<uint32_t>> immutable_rows(immutable_table_.size());
+
+  int last_key = 0;
+  bool first = true;
+  for (const auto &loc : key_locations) {
+    if (first || loc.key != last_key) {
+      mem_keys.push_back(loc.key);
+      if (loc.source == DataSource::MemTable) {
+        memtable_rows.push_back(loc.row_idx);
+      } else {
+        immutable_rows[loc.source_id].push_back(loc.row_idx);
+      }
+      last_key = loc.key;
+      first = false;
+    }
+  }
+
+  // 批量添加
+  if (!memtable_rows.empty()) {
+    sv.AddRows(DataSource::MemTable, 0, 0, std::move(memtable_rows));
+  }
+  for (size_t i = 0; i < immutable_rows.size(); ++i) {
+    if (!immutable_rows[i].empty()) {
+      sv.AddRows(DataSource::Immutable, static_cast<uint32_t>(i), 0,
+                 std::move(immutable_rows[i]));
+    }
+  }
+
+  // SSTable 去重
+  if (mem_keys.empty()) {
+    for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
+      auto &[id, sstable] = *it;
+      if (!sstable->data_file_ || !sstable->data_file_->Valid())
+        continue;
+      for (uint32_t rg_idx = 0; rg_idx < sstable->rowgroups_.size(); ++rg_idx) {
+        sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0,
+                         sstable->rowgroups_[rg_idx].row_count);
+      }
+    }
+    return sv;
+  }
+
+  int mem_min = mem_keys.front();
+  int mem_max = mem_keys.back();
+
+  for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
+    auto &[id, sstable] = *it;
+    if (!sstable->data_file_ || !sstable->data_file_->Valid())
+      continue;
+
+    const Byte *sst_base = sstable->data_file_->Data();
+
+    for (uint32_t rg_idx = 0; rg_idx < sstable->rowgroups_.size(); ++rg_idx) {
+      const auto &rg = sstable->rowgroups_[rg_idx];
+      const auto &pk_zone = rg.columns[primary_key_idx_].zone;
+
+      if (pk_zone.has_value && pk_zone.min.size() == sizeof(int)) {
+        int zone_min = *reinterpret_cast<const int *>(pk_zone.min.data());
+        int zone_max = *reinterpret_cast<const int *>(pk_zone.max.data());
+
+        if (mem_max < zone_min || zone_max < mem_min) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+          continue;
+        }
+
+        auto candidate_start =
+            std::lower_bound(mem_keys.begin(), mem_keys.end(), zone_min);
+        auto candidate_end =
+            std::upper_bound(candidate_start, mem_keys.end(), zone_max);
+
+        if (candidate_start == candidate_end) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+          continue;
+        }
+
+        std::vector<uint32_t> valid_rows;
+        valid_rows.reserve(rg.row_count);
+
+        const Byte *rg_base = sst_base + static_cast<size_t>(rg.offset);
+        const Byte *col_base = rg_base + rg.columns[primary_key_idx_].offset;
+        auto search_it = candidate_start;
+
+        for (uint32_t row_idx = 0; row_idx < rg.row_count; ++row_idx) {
+          int row_key =
+              *reinterpret_cast<const int *>(col_base + row_idx * sizeof(int));
+
+          while (search_it != candidate_end && *search_it < row_key) {
+            ++search_it;
+          }
+
+          if (!(search_it != candidate_end && *search_it == row_key)) {
+            valid_rows.push_back(row_idx);
+          }
+        }
+
+        if (valid_rows.size() == rg.row_count) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+        } else if (!valid_rows.empty()) {
+          sv.AddRows(DataSource::SSTable, id, rg_idx, std::move(valid_rows));
+        }
+      } else {
+        // 无 ZoneMap，全量扫描
+        std::vector<uint32_t> valid_rows;
+        valid_rows.reserve(rg.row_count);
+
+        const Byte *rg_base = sst_base + static_cast<size_t>(rg.offset);
+        const Byte *col_base = rg_base + rg.columns[primary_key_idx_].offset;
+        auto search_it = mem_keys.begin();
+
+        for (uint32_t row_idx = 0; row_idx < rg.row_count; ++row_idx) {
+          int row_key =
+              *reinterpret_cast<const int *>(col_base + row_idx * sizeof(int));
+
+          while (search_it != mem_keys.end() && *search_it < row_key) {
+            ++search_it;
+          }
+
+          if (!(search_it != mem_keys.end() && *search_it == row_key)) {
+            valid_rows.push_back(row_idx);
+          }
+        }
+
+        if (valid_rows.size() == rg.row_count) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+        } else if (!valid_rows.empty()) {
+          sv.AddRows(DataSource::SSTable, id, rg_idx, std::move(valid_rows));
+        }
+      }
+    }
+  }
+
+  return sv;
+}
+
+// 字符串主键（通用实现）
+SelectionVector LSMTree::BuildSelectionVectorString() {
+  SelectionVector sv;
+
+  struct KeyRef {
+    const Byte *ptr;
+    uint32_t len;
+    bool operator<(const KeyRef &other) const {
+      size_t min_len = std::min(len, other.len);
+      int cmp = std::memcmp(ptr, other.ptr, min_len);
+      return cmp != 0 ? cmp < 0 : len < other.len;
+    }
+    bool operator==(const KeyRef &other) const {
+      return len == other.len && std::memcmp(ptr, other.ptr, len) == 0;
+    }
+  };
+
+  struct KeyLocation {
+    KeyRef key;
+    DataSource source;
+    uint32_t source_id;
+    uint32_t row_idx;
+  };
+
+  size_t estimated_count = memtable_->GetImpl().Count();
+  for (auto &imm : immutable_table_) {
+    estimated_count += imm->GetImpl().Count();
+  }
+
+  std::vector<KeyLocation> key_locations;
+  key_locations.reserve(estimated_count);
+
+  // 收集 MemTable
+  {
+    auto &impl = memtable_->GetImpl();
+    const auto &entries = impl.GetStringEntries();
+    const Byte *key_base = impl.KeyData();
+
+    for (size_t i = 0; i < entries.size(); ++i) {
+      const auto &e = entries[i];
+      if (e.value_len == 0)
+        continue;
+      KeyRef k{key_base + e.key_offset, e.key_len};
+      key_locations.push_back(
+          {k, DataSource::MemTable, 0, static_cast<uint32_t>(i)});
+    }
+  }
+
+  // 收集 Immutable
+  for (size_t imm_idx = immutable_table_.size(); imm_idx > 0; --imm_idx) {
+    auto &impl = immutable_table_[imm_idx - 1]->GetImpl();
+    const auto &entries = impl.GetStringEntries();
+    const Byte *key_base = impl.KeyData();
+
+    for (size_t i = 0; i < entries.size(); ++i) {
+      const auto &e = entries[i];
+      if (e.value_len == 0)
+        continue;
+      KeyRef k{key_base + e.key_offset, e.key_len};
+      key_locations.push_back({k, DataSource::Immutable,
+                               static_cast<uint32_t>(imm_idx - 1),
+                               static_cast<uint32_t>(i)});
+    }
+  }
+
   std::stable_sort(
       key_locations.begin(), key_locations.end(),
       [](const KeyLocation &a, const KeyLocation &b) { return a.key < b.key; });
 
-  // 去重：只保留每个 key 的第一个出现（即最新版本）
-  std::vector<std::string> mem_keys; // 有序的去重后 key 列表
-  {
-    std::string last_key;
-    bool first = true;
-    for (const auto &loc : key_locations) {
-      if (first || loc.key != last_key) {
-        mem_keys.push_back(loc.key);
-        sv.AddRow(loc.source, loc.source_id, 0, loc.row_idx);
-        last_key = loc.key;
-        first = false;
+  std::vector<KeyRef> mem_keys;
+  mem_keys.reserve(key_locations.size());
+
+  std::vector<uint32_t> memtable_rows;
+  std::vector<std::vector<uint32_t>> immutable_rows(immutable_table_.size());
+
+  KeyRef last_key{nullptr, 0};
+  bool first = true;
+  for (const auto &loc : key_locations) {
+    if (first || !(loc.key == last_key)) {
+      mem_keys.push_back(loc.key);
+      if (loc.source == DataSource::MemTable) {
+        memtable_rows.push_back(loc.row_idx);
+      } else {
+        immutable_rows[loc.source_id].push_back(loc.row_idx);
       }
+      last_key = loc.key;
+      first = false;
     }
   }
 
-  // --- 阶段 2: 扫描 SSTable (高性能版) ---
-  // mem_keys 现在是有序的，可用二分查找和双指针
-
-  // 全局边界，用于 O(1) 快速跳过
-  std::string mem_min_key, mem_max_key;
-  if (!mem_keys.empty()) {
-    mem_min_key = mem_keys.front();
-    mem_max_key = mem_keys.back();
+  if (!memtable_rows.empty()) {
+    sv.AddRows(DataSource::MemTable, 0, 0, std::move(memtable_rows));
   }
+  for (size_t i = 0; i < immutable_rows.size(); ++i) {
+    if (!immutable_rows[i].empty()) {
+      sv.AddRows(DataSource::Immutable, static_cast<uint32_t>(i), 0,
+                 std::move(immutable_rows[i]));
+    }
+  }
+
+  // SSTable 去重
+  if (mem_keys.empty()) {
+    for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
+      auto &[id, sstable] = *it;
+      if (!sstable->data_file_ || !sstable->data_file_->Valid())
+        continue;
+      for (uint32_t rg_idx = 0; rg_idx < sstable->rowgroups_.size(); ++rg_idx) {
+        sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0,
+                         sstable->rowgroups_[rg_idx].row_count);
+      }
+    }
+    return sv;
+  }
+
+  KeyRef mem_min = mem_keys.front();
+  KeyRef mem_max = mem_keys.back();
 
   for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
     auto &[id, sstable] = *it;
-    if (!sstable->data_file_ || !sstable->data_file_->Valid()) {
+    if (!sstable->data_file_ || !sstable->data_file_->Valid())
       continue;
-    }
 
-    for (uint32_t rg_idx = 0; rg_idx < sstable->rowgroups_.size(); rg_idx++) {
+    const Byte *sst_base = sstable->data_file_->Data();
+
+    for (uint32_t rg_idx = 0; rg_idx < sstable->rowgroups_.size(); ++rg_idx) {
       const auto &rg = sstable->rowgroups_[rg_idx];
-
-      // [Fast Path 1] MemTable 为空，SSTable 全部有效
-      if (mem_keys.empty()) {
-        sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
-        continue;
-      }
-
-      // [Fast Path 2] 全局 ZoneMap 剪枝 O(1)
       const auto &pk_zone = rg.columns[primary_key_idx_].zone;
-      bool range_overlap = true;
 
       if (pk_zone.has_value) {
-        // 比较 RowGroup 范围 [rg_min, rg_max] 与 MemTable 范围 [mem_min,
-        // mem_max] 如果完全不相交，直接全选
-        if (mem_max_key < std::string(pk_zone.min.begin(), pk_zone.min.end()) ||
-            mem_min_key > std::string(pk_zone.max.begin(), pk_zone.max.end())) {
-          range_overlap = false;
-        }
-      }
+        KeyRef zone_min{reinterpret_cast<const Byte *>(pk_zone.min.data()),
+                        static_cast<uint32_t>(pk_zone.min.size())};
+        KeyRef zone_max{reinterpret_cast<const Byte *>(pk_zone.max.data()),
+                        static_cast<uint32_t>(pk_zone.max.size())};
 
-      if (!range_overlap) {
-        sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
-        continue;
-      }
-
-      // [Slow Path] 范围有重叠，用二分查找定位候选区间
-      auto candidate_start = mem_keys.begin();
-      auto candidate_end = mem_keys.end();
-
-      if (pk_zone.has_value) {
-        std::string rg_min_str(pk_zone.min.begin(), pk_zone.min.end());
-        std::string rg_max_str(pk_zone.max.begin(), pk_zone.max.end());
-        // 找到第一个 >= rg_min 的位置
-        candidate_start =
-            std::lower_bound(mem_keys.begin(), mem_keys.end(), rg_min_str);
-        // 找到第一个 > rg_max 的位置
-        candidate_end =
-            std::upper_bound(candidate_start, mem_keys.end(), rg_max_str);
-      }
-
-      // 区间内没有 mem_key，说明无重叠
-      if (candidate_start == candidate_end) {
-        sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
-        continue;
-      }
-
-      // 逐行检查，用双指针加速
-      const Byte *base =
-          sstable->data_file_->Data() + static_cast<size_t>(rg.offset);
-      auto key_type = column_types_[primary_key_idx_]->GetType();
-
-      // 双指针：search_it 只往前走，不回退
-      auto search_it = candidate_start;
-
-      for (uint32_t row_idx = 0; row_idx < rg.row_count; row_idx++) {
-        const Byte *key_ptr = nullptr;
-        uint32_t key_len = 0;
-        if (!GetColumnValuePointer(base, rg, row_idx, primary_key_idx_,
-                                   key_type, key_ptr, key_len)) {
+        if (mem_max < zone_min || zone_max < mem_min) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
           continue;
         }
 
-        std::string row_key_str(reinterpret_cast<const char *>(key_ptr),
-                                key_len);
+        auto candidate_start =
+            std::lower_bound(mem_keys.begin(), mem_keys.end(), zone_min);
+        auto candidate_end =
+            std::upper_bound(candidate_start, mem_keys.end(), zone_max);
 
-        // 双指针推进：跳过小于当前行 key 的 mem_keys
-        while (search_it != candidate_end && *search_it < row_key_str) {
-          ++search_it;
+        if (candidate_start == candidate_end) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+          continue;
         }
 
-        // 检查是否命中
-        if (search_it != candidate_end && *search_it == row_key_str) {
-          // key 在 MemTable/Immutable 中存在，跳过 SSTable 的旧版本
-        } else {
-          // 有效数据，加入 SV
-          sv.AddRow(DataSource::SSTable, id, rg_idx, row_idx);
+        std::vector<uint32_t> valid_rows;
+        valid_rows.reserve(rg.row_count);
+
+        const Byte *rg_base = sst_base + static_cast<size_t>(rg.offset);
+        auto key_type = column_types_[primary_key_idx_]->GetType();
+        auto search_it = candidate_start;
+
+        for (uint32_t row_idx = 0; row_idx < rg.row_count; ++row_idx) {
+          const Byte *key_ptr = nullptr;
+          uint32_t key_len = 0;
+          if (!GetColumnValuePointer(rg_base, rg, row_idx, primary_key_idx_,
+                                     key_type, key_ptr, key_len)) {
+            continue;
+          }
+
+          KeyRef row_key{key_ptr, key_len};
+          while (search_it != candidate_end && *search_it < row_key) {
+            ++search_it;
+          }
+
+          if (!(search_it != candidate_end && *search_it == row_key)) {
+            valid_rows.push_back(row_idx);
+          }
+        }
+
+        if (valid_rows.size() == rg.row_count) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+        } else if (!valid_rows.empty()) {
+          sv.AddRows(DataSource::SSTable, id, rg_idx, std::move(valid_rows));
+        }
+      } else {
+        std::vector<uint32_t> valid_rows;
+        valid_rows.reserve(rg.row_count);
+
+        const Byte *rg_base = sst_base + static_cast<size_t>(rg.offset);
+        auto key_type = column_types_[primary_key_idx_]->GetType();
+        auto search_it = mem_keys.begin();
+
+        for (uint32_t row_idx = 0; row_idx < rg.row_count; ++row_idx) {
+          const Byte *key_ptr = nullptr;
+          uint32_t key_len = 0;
+          if (!GetColumnValuePointer(rg_base, rg, row_idx, primary_key_idx_,
+                                     key_type, key_ptr, key_len)) {
+            continue;
+          }
+
+          KeyRef row_key{key_ptr, key_len};
+          while (search_it != mem_keys.end() && *search_it < row_key) {
+            ++search_it;
+          }
+
+          if (!(search_it != mem_keys.end() && *search_it == row_key)) {
+            valid_rows.push_back(row_idx);
+          }
+        }
+
+        if (valid_rows.size() == rg.row_count) {
+          sv.AddContiguous(DataSource::SSTable, id, rg_idx, 0, rg.row_count);
+        } else if (!valid_rows.empty()) {
+          sv.AddRows(DataSource::SSTable, id, rg_idx, std::move(valid_rows));
         }
       }
     }

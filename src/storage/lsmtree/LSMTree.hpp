@@ -33,6 +33,10 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   std::vector<MemTableRef> immutable_table_;
   std::map<uint32_t, SSTableRef> sstables_;
 
+  // 主键类型特化的 BuildSelectionVector 实现
+  SelectionVector BuildSelectionVectorInt();
+  SelectionVector BuildSelectionVectorString();
+
 public:
   LSMTree(std::filesystem::path table_path,
           std::shared_ptr<BufferPoolManager> buffer_pool_manager,

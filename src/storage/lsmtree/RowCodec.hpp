@@ -91,6 +91,31 @@ public:
     return false;
   }
 
+  // 零拷贝版本：直接返回指向原始数据的指针，不分配内存
+  static bool DecodeColumnRaw(const Byte *data, size_t size, size_t column_idx,
+                              const Byte *&out_ptr, uint32_t &out_len) {
+    const Byte *p = data;
+    size_t remaining = size;
+    for (size_t i = 0; i <= column_idx; i++) {
+      if (remaining < sizeof(uint32_t))
+        return false;
+      uint32_t len;
+      std::memcpy(&len, p, sizeof(len));
+      p += sizeof(len);
+      remaining -= sizeof(len);
+      if (remaining < len)
+        return false;
+      if (i == column_idx) {
+        out_ptr = p;
+        out_len = len;
+        return true;
+      }
+      p += len;
+      remaining -= len;
+    }
+    return false;
+  }
+
   static bool
   DecodeRow(const Slice &row, size_t column_count,
             const std::function<void(size_t, const Byte *, uint32_t)> &cb) {
