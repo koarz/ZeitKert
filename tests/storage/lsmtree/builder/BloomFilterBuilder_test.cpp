@@ -1,5 +1,5 @@
-#include "storage/lsmtree/builder/BloomFilterBuilder.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "storage/lsmtree/builder/BloomFilterBuilder.hpp"
 
 #include <array>
 #include <cstddef>
@@ -49,15 +49,13 @@ TEST(BloomFilterBuilderTest, AddKeySetsExpectedBitsInBlock) {
   std::array<unsigned char, kBlockBytes> expected{};
   for (size_t i = 0; i < kNumProbes; ++i) {
     const uint32_t bit_pos = current_h & 511;
-    expected[bit_pos / 8] |=
-        static_cast<unsigned char>(1U << (bit_pos % 8));
+    expected[bit_pos / 8] |= static_cast<unsigned char>(1U << (bit_pos % 8));
     current_h += delta;
   }
 
   const size_t block_start = block_idx * kBlockBytes;
   for (size_t i = 0; i < data.size(); ++i) {
-    const unsigned char actual =
-        static_cast<unsigned char>(data[i]);
+    const unsigned char actual = static_cast<unsigned char>(data[i]);
     if (i < block_start || i >= block_start + kBlockBytes) {
       EXPECT_EQ(actual, 0);
       continue;

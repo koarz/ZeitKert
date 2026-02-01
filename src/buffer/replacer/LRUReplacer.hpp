@@ -25,7 +25,7 @@ public:
   LRUReplacer(const LRUReplacer &) = delete;
   LRUReplacer(LRUReplacer &&) = delete;
 
-  ~LRUReplacer() override{};
+  ~LRUReplacer() override {};
 
   void Evict(frame_id_t *frame_id) override;
 

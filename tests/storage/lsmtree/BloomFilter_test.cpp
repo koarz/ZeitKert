@@ -1,12 +1,11 @@
+#include "common/Config.hpp"
+#include "common/Hash.hpp"
 #include "storage/lsmtree/BloomFilter.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/builder/BloomFilterBuilder.hpp"
 
-#include "common/Config.hpp"
-#include "common/Hash.hpp"
-
-#include <gtest/gtest.h>
 #include <array>
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
@@ -81,8 +80,7 @@ TEST(BloomFilterTest, MissingBitReturnsFalse) {
   for (size_t i = 0; i < kNumProbes; ++i) {
     const uint32_t bit_pos = current_h & 511;
     bit_positions[i] = bit_pos;
-    const unsigned char mask =
-        static_cast<unsigned char>(1U << (bit_pos % 8));
+    const unsigned char mask = static_cast<unsigned char>(1U << (bit_pos % 8));
     const unsigned char existing =
         static_cast<unsigned char>(data[bit_pos / 8]);
     data[bit_pos / 8] = static_cast<char>(existing | mask);

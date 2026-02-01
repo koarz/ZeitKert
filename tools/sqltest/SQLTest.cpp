@@ -242,8 +242,7 @@ int main(int argc, char *argv[]) {
       std::string file_pattern = p.filename().string();
 
       // 遍历目录查找匹配文件
-      for (const auto &entry :
-           std::filesystem::directory_iterator(dir)) {
+      for (const auto &entry : std::filesystem::directory_iterator(dir)) {
         if (entry.is_regular_file()) {
           std::string filename = entry.path().filename().string();
           // 简单通配符匹配（只支持 *.sql）

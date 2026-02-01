@@ -60,8 +60,8 @@ static std::string OperatorName(FunctionBinaryArithmetic::Operator op) {
   return "ARITH";
 }
 
-FunctionBinaryArithmetic::FunctionBinaryArithmetic(Operator op,
-                                                   std::shared_ptr<ValueType> result_type)
+FunctionBinaryArithmetic::FunctionBinaryArithmetic(
+    Operator op, std::shared_ptr<ValueType> result_type)
     : name_(OperatorName(op)), op_(op), result_type_(std::move(result_type)) {}
 
 Status FunctionBinaryArithmetic::ExecuteImpl(Block &block, size_t result_idx,

@@ -36,7 +36,7 @@ class SkipList {
 public:
   explicit SkipList(uint32_t max_level, KeyCompare compere)
       : max_level_(max_level), compere_(compere),
-        root_(std::make_shared<SkipListNode<Key, Value>>(max_level_)){};
+        root_(std::make_shared<SkipListNode<Key, Value>>(max_level_)) {};
 
   ~SkipList() { Clear(); }
 
