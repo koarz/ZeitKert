@@ -57,27 +57,37 @@ Status FunctionComparison::ExecuteImpl(Block &block, size_t result_idx,
     int result = 0;
 
     // 数值比较
-    if ((lhs_type == ValueType::Type::Int || lhs_type == ValueType::Type::Double) &&
-        (rhs_type == ValueType::Type::Int || rhs_type == ValueType::Type::Double)) {
+    if ((lhs_type == ValueType::Type::Int ||
+         lhs_type == ValueType::Type::Double) &&
+        (rhs_type == ValueType::Type::Int ||
+         rhs_type == ValueType::Type::Double)) {
       double lhs_value = 0.0, rhs_value = 0.0;
 
       if (lhs_type == ValueType::Type::Int) {
-        lhs_value = static_cast<ColumnVector<int> &>(*lhs->GetColumn())[lhs_idx];
+        lhs_value =
+            static_cast<ColumnVector<int> &>(*lhs->GetColumn())[lhs_idx];
       } else {
-        lhs_value = static_cast<ColumnVector<double> &>(*lhs->GetColumn())[lhs_idx];
+        lhs_value =
+            static_cast<ColumnVector<double> &>(*lhs->GetColumn())[lhs_idx];
       }
 
       if (rhs_type == ValueType::Type::Int) {
-        rhs_value = static_cast<ColumnVector<int> &>(*rhs->GetColumn())[rhs_idx];
+        rhs_value =
+            static_cast<ColumnVector<int> &>(*rhs->GetColumn())[rhs_idx];
       } else {
-        rhs_value = static_cast<ColumnVector<double> &>(*rhs->GetColumn())[rhs_idx];
+        rhs_value =
+            static_cast<ColumnVector<double> &>(*rhs->GetColumn())[rhs_idx];
       }
 
       switch (op_) {
       case Operator::Less: result = lhs_value < rhs_value ? 1 : 0; break;
-      case Operator::LessOrEquals: result = lhs_value <= rhs_value ? 1 : 0; break;
+      case Operator::LessOrEquals:
+        result = lhs_value <= rhs_value ? 1 : 0;
+        break;
       case Operator::Greater: result = lhs_value > rhs_value ? 1 : 0; break;
-      case Operator::GreaterOrEquals: result = lhs_value >= rhs_value ? 1 : 0; break;
+      case Operator::GreaterOrEquals:
+        result = lhs_value >= rhs_value ? 1 : 0;
+        break;
       case Operator::Equals: result = lhs_value == rhs_value ? 1 : 0; break;
       case Operator::NotEquals: result = lhs_value != rhs_value ? 1 : 0; break;
       }

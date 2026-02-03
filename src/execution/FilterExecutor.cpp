@@ -56,8 +56,7 @@ static ColumnPtr FilterColumnData(const ColumnPtr &col,
     }
     return dst;
   }
-  default:
-    return col;
+  default: return col;
   }
 }
 
@@ -171,8 +170,7 @@ ColumnPtr FilterExecutor::EvalCondition(const BoundExpressRef &expr) {
       col->Insert(std::string(constant.value_.str, constant.size_));
       return col;
     }
-    default:
-      return nullptr;
+    default: return nullptr;
     }
   }
   case BoundExpressType::BoundFunction: {
@@ -224,8 +222,7 @@ ColumnPtr FilterExecutor::EvalCondition(const BoundExpressRef &expr) {
     case ValueType::Type::String:
       res_data = std::make_shared<ColumnString>();
       break;
-    default:
-      return nullptr;
+    default: return nullptr;
     }
 
     size_t result_idx = block.Size();
@@ -239,8 +236,7 @@ ColumnPtr FilterExecutor::EvalCondition(const BoundExpressRef &expr) {
 
     return block.GetColumn(result_idx)->GetColumn();
   }
-  default:
-    return nullptr;
+  default: return nullptr;
   }
 }
 
