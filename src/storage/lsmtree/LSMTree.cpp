@@ -596,12 +596,12 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
   }
 
   // 排序：同 key 时 row_idx 大的（新版本）排前面
-  std::stable_sort(
-      key_locations.begin(), key_locations.end(),
-      [](const IntKeyLoc &a, const IntKeyLoc &b) {
-        if (a.key != b.key) return a.key < b.key;
-        return a.row_idx > b.row_idx;
-      });
+  std::stable_sort(key_locations.begin(), key_locations.end(),
+                   [](const IntKeyLoc &a, const IntKeyLoc &b) {
+                     if (a.key != b.key)
+                       return a.key < b.key;
+                     return a.row_idx > b.row_idx;
+                   });
 
   // 去重并分组（取第一个即最新版本）
   std::vector<int> mem_keys;
@@ -808,12 +808,12 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
   }
 
   // 排序：同 key 时 row_idx 大的（新版本）排前面
-  std::stable_sort(
-      key_locations.begin(), key_locations.end(),
-      [](const KeyLocation &a, const KeyLocation &b) {
-        if (!(a.key == b.key)) return a.key < b.key;
-        return a.row_idx > b.row_idx;
-      });
+  std::stable_sort(key_locations.begin(), key_locations.end(),
+                   [](const KeyLocation &a, const KeyLocation &b) {
+                     if (!(a.key == b.key))
+                       return a.key < b.key;
+                     return a.row_idx > b.row_idx;
+                   });
 
   std::vector<KeyRef> mem_keys;
   mem_keys.reserve(key_locations.size());
@@ -961,5 +961,56 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
   }
 
   return sv;
+}
+
+Status LSMTree::FlushToSST() {
+  std::unique_lock lock(latch_);
+  std::unique_lock imm_lock(immutable_latch_);
+
+  auto pk_type = column_types_.empty()
+                     ? ValueType::Type::String
+                     : column_types_[primary_key_idx_]->GetType();
+
+  // 如果当前 memtable_ 有数据，先转为 immutable
+  if (memtable_->GetApproximateSize() > 0) {
+    memtable_->ToImmutable();
+    immutable_table_.push_back(std::move(memtable_));
+    // 创建新的 memtable
+    memtable_ = std::make_unique<MemTable>(
+        MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
+  }
+
+  // 将所有 immutable tables 刷盘为 SST 文件
+  while (!immutable_table_.empty()) {
+    auto &imm = immutable_table_.front();
+
+    // 跳过空的 immutable table
+    if (imm->GetApproximateSize() == 0) {
+      imm->DeleteWal();
+      immutable_table_.erase(immutable_table_.begin());
+      continue;
+    }
+
+    std::vector<MemTableRef> to_flush;
+    to_flush.push_back(std::move(imm));
+    immutable_table_.erase(immutable_table_.begin());
+
+    auto &table_meta = sstables_[table_number_] = std::make_shared<SSTable>();
+    table_meta->sstable_id_ = table_number_;
+
+    auto s = TableOperator::BuildSSTable(column_path_, table_number_, to_flush,
+                                         column_types_, primary_key_idx_,
+                                         table_meta);
+    if (!s.ok()) {
+      return s;
+    }
+
+    // 刷盘后删除 WAL 文件
+    for (auto &mem : to_flush) {
+      mem->DeleteWal();
+    }
+  }
+
+  return Status::OK();
 }
 } // namespace DB

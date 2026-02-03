@@ -9,8 +9,10 @@
 #include "parser/Checker.hpp"
 #include "parser/statement/CreateStatement.hpp"
 #include "parser/statement/DropStatement.hpp"
+#include "parser/statement/FlushStatement.hpp"
 #include "parser/statement/ShowStatement.hpp"
 #include "parser/statement/UseStatement.hpp"
+#include "storage/lsmtree/LSMTree.hpp"
 
 #include <filesystem>
 #include <memory>
@@ -41,6 +43,7 @@ static void RegisterChecker() {
   Checker::RegisterKeyWord("WHERE");
   Checker::RegisterKeyWord("UNIQUE");
   Checker::RegisterKeyWord("KEY");
+  Checker::RegisterKeyWord("FLUSH");
 
   Checker::RegisterType("INT");
   Checker::RegisterType("STRING");
@@ -140,5 +143,30 @@ Status ZeitKert::HandleShowStatement(ResultSet &result_set) {
     break;
   }
   return status;
+}
+
+Status ZeitKert::HandleFlushStatement() {
+  auto &flush_statement =
+      static_cast<FlushStatement &>(*context_->sql_statement_);
+  std::string table_name = flush_statement.GetTableName();
+
+  if (context_->database_ == nullptr) {
+    return Status::Error(ErrorCode::NotChoiceDatabase,
+                         "You have not choice a database");
+  }
+
+  auto table_meta = context_->database_->GetTableMeta(table_name);
+  if (table_meta == nullptr) {
+    return Status::Error(ErrorCode::NotFound,
+                         "Table " + table_name + " not found");
+  }
+
+  auto lsm_tree = context_->GetOrCreateLSMTree(table_meta);
+  if (lsm_tree == nullptr) {
+    return Status::Error(ErrorCode::IOError,
+                         "Failed to get LSMTree for table " + table_name);
+  }
+
+  return lsm_tree->FlushToSST();
 }
 } // namespace DB

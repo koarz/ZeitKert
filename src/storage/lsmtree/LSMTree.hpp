@@ -60,6 +60,9 @@ public:
 
   uint32_t GetTableNum() { return table_number_; }
 
+  // 手动刷盘：将当前 MemTable 和所有 Immutable tables 刷盘为 SST 文件
+  Status FlushToSST();
+
   uint16_t GetPrimaryKeyIndex() const { return primary_key_idx_; }
 
   const std::vector<std::shared_ptr<ValueType>> &GetColumnTypes() const {

@@ -24,6 +24,8 @@ class ZeitKert {
 
   Status HandleShowStatement(ResultSet &result_set);
 
+  Status HandleFlushStatement();
+
 public:
   ZeitKert();
 
@@ -53,6 +55,9 @@ public:
       goto ExecuteEnd;
     case StatementType::DropStatement:
       status = HandleDropStatement();
+      goto ExecuteEnd;
+    case StatementType::FlushStatement:
+      status = HandleFlushStatement();
       goto ExecuteEnd;
     case StatementType::InvalidStatement:
     case StatementType::SelectStatement:

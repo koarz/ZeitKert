@@ -24,6 +24,8 @@ public:
 
   Status ParseInsert(TokenIterator &iterator);
 
+  Status ParseFlush(TokenIterator &iterator);
+
   ASTPtr tree_{nullptr};
 };
 } // namespace DB

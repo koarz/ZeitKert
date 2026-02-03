@@ -4,6 +4,7 @@
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
 #include "parser/ASTDropQuery.hpp"
+#include "parser/ASTFlushQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
@@ -43,11 +44,13 @@ Status Parser::Parse(TokenIterator &iterator) {
       status = ParseSelect(iterator);
     } else if (str == "INSERT") {
       status = ParseInsert(iterator);
+    } else if (str == "FLUSH") {
+      status = ParseFlush(iterator);
     }
   } else {
-    status = Status::Error(
-        ErrorCode::SyntaxError,
-        "ZeitKert Just Support CREATE, USE, SHOW, DROP, SELECT, INSERT Query");
+    status = Status::Error(ErrorCode::SyntaxError,
+                           "ZeitKert Just Support CREATE, USE, SHOW, DROP, "
+                           "SELECT, INSERT, FLUSH Query");
   }
   return status;
 }
@@ -270,6 +273,22 @@ Status Parser::ParseInsert(TokenIterator &iterator) {
   }
 SYNTAXERROR:
   return Status::Error(ErrorCode::SyntaxError, "your query have syntax error");
+}
+
+Status Parser::ParseFlush(TokenIterator &iterator) {
+  // FLUSH <table_name>
+  ++iterator;
+  if (iterator->type != TokenType::BareWord) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "Expected table name after FLUSH");
+  }
+  std::string table_name{iterator->begin, iterator->end};
+  if (!(++iterator)->isEnd()) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "Unexpected token after table name");
+  }
+  tree_ = std::make_shared<FlushQuery>(std::move(table_name));
+  return Status::OK();
 }
 
 } // namespace DB

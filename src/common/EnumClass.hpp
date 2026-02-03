@@ -28,6 +28,7 @@ enum class StatementType {
   SelectStatement,
   InsertStatement,
   DropStatement,
+  FlushStatement,
 };
 
 enum class ASTNodeType {
@@ -43,6 +44,7 @@ enum class ASTNodeType {
   InsertQuery,
   TableNames,
   Token,
+  FlushQuery,
 };
 
 enum class ShowType {
