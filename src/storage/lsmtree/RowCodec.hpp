@@ -14,6 +14,32 @@
 namespace DB {
 class RowCodec {
 public:
+  // 直接二进制追加（跳过 string 转换，用于 bulk insert）
+  static void AppendInt(std::string &buffer, int v) {
+    uint32_t len = sizeof(int);
+    buffer.append(reinterpret_cast<const char *>(&len), sizeof(len));
+    buffer.append(reinterpret_cast<const char *>(&v), sizeof(int));
+  }
+
+  static void AppendDouble(std::string &buffer, double v) {
+    uint32_t len = sizeof(double);
+    buffer.append(reinterpret_cast<const char *>(&len), sizeof(len));
+    buffer.append(reinterpret_cast<const char *>(&v), sizeof(double));
+  }
+
+  static void AppendString(std::string &buffer, std::string_view v) {
+    uint32_t len = static_cast<uint32_t>(v.size());
+    buffer.append(reinterpret_cast<const char *>(&len), sizeof(len));
+    if (len > 0) {
+      buffer.append(v.data(), v.size());
+    }
+  }
+
+  static void AppendNull(std::string &buffer) {
+    uint32_t len = 0;
+    buffer.append(reinterpret_cast<const char *>(&len), sizeof(len));
+  }
+
   static void AppendValue(std::string &buffer, ValueType::Type type,
                           std::string_view value) {
     // 行编码使用长度前缀按列追加

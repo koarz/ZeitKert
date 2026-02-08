@@ -65,6 +65,9 @@ public:
 
   Status Insert(const Slice &key, const Slice &value) override;
 
+  // 批量插入：一次加锁，WAL 延迟 flush
+  Status BatchInsert(std::vector<std::pair<Slice, Slice>> &entries);
+
   Status Remove(const Slice &key) override;
 
   Status GetValue(const Slice &key, Slice *column) override;

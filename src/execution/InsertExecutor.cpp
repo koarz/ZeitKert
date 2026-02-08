@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace DB {
@@ -37,54 +38,104 @@ Status InsertExecutor::Execute() {
 
   if (bulk_rows_ > 0) {
     uint32_t base_row = row_number;
-    for (size_t row_idx = 0; row_idx < bulk_rows_; row_idx++) {
-      uint32_t row_id = base_row + static_cast<uint32_t>(row_idx);
-      std::string row_tag = std::to_string(row_id);
-      std::string row_buffer;
-      row_buffer.reserve(128);
-      Slice key;
-      for (size_t col_idx = 0; col_idx < col_meta.size(); col_idx++) {
-        const auto &meta = col_meta[col_idx];
-        auto type = meta->type_->GetType();
-        std::string value;
-        switch (type) {
-        case ValueType::Type::Int: {
-          int v = static_cast<int>(row_id + col_idx);
-          if (static_cast<int>(col_idx) == unique_col_idx) {
-            key = Slice{v};
-          }
-          value = std::to_string(v);
-          break;
-        }
-        case ValueType::Type::Double: {
-          double v =
-              static_cast<double>(row_id) + static_cast<double>(col_idx) * 0.01;
-          if (static_cast<int>(col_idx) == unique_col_idx) {
-            key = Slice{v};
-          }
-          value = std::to_string(v);
-          break;
-        }
-        case ValueType::Type::String: {
-          value = meta->name_ + "_" + row_tag;
-          if (static_cast<int>(col_idx) == unique_col_idx) {
-            key = Slice{value};
-          }
-          break;
-        }
-        case ValueType::Type::Null:
-          return Status::Error(ErrorCode::InsertError,
-                               "UNIQUE KEY column cannot be NULL");
-        }
-        RowCodec::AppendValue(row_buffer, type, value);
-      }
 
-      status = lsm_tree_->Insert(key, Slice{row_buffer});
-      if (!status.ok()) {
-        return status;
-      }
-      inserted_row++;
+    // 确定线程数
+    size_t num_threads = std::thread::hardware_concurrency();
+    if (num_threads == 0) {
+      num_threads = 1;
     }
+    num_threads = std::min(num_threads, static_cast<size_t>(8));
+    if (bulk_rows_ < 10000) {
+      num_threads = 1;
+    }
+
+    // 多线程并行编码行数据
+    std::vector<std::vector<std::pair<Slice, Slice>>> thread_results(
+        num_threads);
+    std::vector<std::thread> threads;
+    size_t rows_per_thread = bulk_rows_ / num_threads;
+    size_t remainder = bulk_rows_ % num_threads;
+
+    for (size_t t = 0; t < num_threads; t++) {
+      size_t start = t * rows_per_thread + std::min(t, remainder);
+      size_t count = rows_per_thread + (t < remainder ? 1 : 0);
+
+      threads.emplace_back([&, t, start, count]() {
+        auto &result = thread_results[t];
+        result.reserve(count);
+
+        for (size_t i = 0; i < count; i++) {
+          uint32_t row_id = base_row + static_cast<uint32_t>(start + i);
+          std::string row_buffer;
+          row_buffer.reserve(128);
+          Slice key;
+
+          for (size_t col_idx = 0; col_idx < col_meta.size(); col_idx++) {
+            const auto &meta = col_meta[col_idx];
+            auto type = meta->type_->GetType();
+            switch (type) {
+            case ValueType::Type::Int: {
+              int v = static_cast<int>(row_id + col_idx);
+              if (static_cast<int>(col_idx) == unique_col_idx) {
+                key = Slice{v};
+              }
+              RowCodec::AppendInt(row_buffer, v);
+              break;
+            }
+            case ValueType::Type::Double: {
+              double v = static_cast<double>(row_id) +
+                         static_cast<double>(col_idx) * 0.01;
+              if (static_cast<int>(col_idx) == unique_col_idx) {
+                key = Slice{v};
+              }
+              RowCodec::AppendDouble(row_buffer, v);
+              break;
+            }
+            case ValueType::Type::String: {
+              std::string v = meta->name_ + "_" + std::to_string(row_id);
+              if (static_cast<int>(col_idx) == unique_col_idx) {
+                key = Slice{v};
+              }
+              RowCodec::AppendString(row_buffer, v);
+              break;
+            }
+            case ValueType::Type::Null:
+              RowCodec::AppendNull(row_buffer);
+              break;
+            }
+          }
+
+          result.emplace_back(std::move(key), Slice{std::move(row_buffer)});
+        }
+      });
+    }
+
+    for (auto &t : threads) {
+      t.join();
+    }
+
+    // 合并所有线程结果
+    std::vector<std::pair<Slice, Slice>> all_entries;
+    size_t total = 0;
+    for (auto &r : thread_results) {
+      total += r.size();
+    }
+    all_entries.reserve(total);
+    for (auto &r : thread_results) {
+      for (auto &e : r) {
+        all_entries.push_back(std::move(e));
+      }
+    }
+
+    LOG_INFO("BulkInsert: {} rows encoded with {} thread(s), inserting...",
+             all_entries.size(), num_threads);
+
+    // 批量插入
+    status = lsm_tree_->BatchInsert(all_entries);
+    if (!status.ok()) {
+      return status;
+    }
+    inserted_row = static_cast<uint32_t>(all_entries.size());
   } else {
     for (auto &child : children_) {
       status = child->Execute();

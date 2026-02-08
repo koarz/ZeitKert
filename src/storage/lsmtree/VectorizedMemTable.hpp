@@ -361,6 +361,10 @@ public:
 
   void ToImmutable() { wal_.Finish(); }
 
+  void SetDeferFlush(bool defer) { wal_.SetDeferFlush(defer); }
+
+  void FlushWal() { wal_.Flush(); }
+
   std::filesystem::path GetWalPath() const { return wal_.GetPath(); }
 
   void DeleteWal() { WAL::Remove(wal_.GetPath()); }

@@ -28,8 +28,16 @@ Status WAL::WriteSlice(const Slice &key, const Slice &value) {
   if (fs_.bad()) {
     return Status::Error(ErrorCode::IOError, "I/O error when writing page");
   }
-  fs_.flush();
+  if (!defer_flush_) {
+    fs_.flush();
+  }
   return Status::OK();
+}
+
+void WAL::Flush() {
+  if (write_log_ && fs_.is_open()) {
+    fs_.flush();
+  }
 }
 
 bool WAL::ReadFromLogFile(Slice *key, Slice *value) {

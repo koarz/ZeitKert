@@ -11,6 +11,7 @@ namespace DB {
 // Write Ahead Log
 class WAL {
   bool write_log_;
+  bool defer_flush_{false};
   std::filesystem::path path_;
   std::fstream fs_;
 
@@ -35,6 +36,10 @@ public:
   void StartWriteLog() { write_log_ = true; }
 
   void StopWriteLog() { write_log_ = false; }
+
+  void SetDeferFlush(bool defer) { defer_flush_ = defer; }
+
+  void Flush();
 
   void Finish() { fs_.close(); }
 

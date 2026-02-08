@@ -469,6 +469,86 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   return memtable_->Put(key, value);
 }
 
+Status LSMTree::BatchInsert(std::vector<std::pair<Slice, Slice>> &entries) {
+  if (entries.empty()) {
+    return Status::OK();
+  }
+
+  std::unique_lock lock(latch_);
+
+  // 开启 WAL 延迟 flush
+  memtable_->SetDeferFlush(true);
+
+  for (auto &[key, value] : entries) {
+    if (value.Size() > SSTABLE_SIZE) {
+      memtable_->FlushWal();
+      memtable_->SetDeferFlush(false);
+      return Status::Error(
+          ErrorCode::InsertError,
+          "Your row data too large, please split it to less than 64MB");
+    }
+
+    auto size = memtable_->GetApproximateSize();
+    if (size >= SSTABLE_SIZE) {
+      // 先 flush 当前 MemTable 积累的 WAL
+      memtable_->FlushWal();
+
+      LOG_INFO("BatchInsert: MemTable full (size={}), converting to immutable",
+               size);
+      std::unique_lock imm_lock(immutable_latch_);
+      memtable_->ToImmutable();
+      immutable_table_.push_back(std::move(memtable_));
+      if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
+        LOG_INFO("BatchInsert: Immutable buffer full, flushing oldest");
+        std::vector<MemTableRef> to_flush;
+        to_flush.push_back(std::move(immutable_table_.front()));
+        immutable_table_.erase(immutable_table_.begin());
+
+        auto sstable_id = GetNextTableId();
+        auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
+        table_meta->sstable_id_ = sstable_id;
+
+        uint32_t out_id = sstable_id;
+        auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
+                                             column_types_, primary_key_idx_,
+                                             table_meta);
+        if (!s.ok()) {
+          return s;
+        }
+
+        AddToL0(sstable_id, table_meta);
+        for (auto &mem : to_flush) {
+          mem->DeleteWal();
+        }
+
+        if (compaction_scheduler_) {
+          compaction_scheduler_->MaybeScheduleCompaction();
+        }
+      }
+
+      auto pk_type = column_types_.empty()
+                         ? ValueType::Type::String
+                         : column_types_[primary_key_idx_]->GetType();
+      memtable_ = std::make_unique<MemTable>(
+          MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
+      memtable_->SetDeferFlush(true);
+    }
+
+    auto s = memtable_->Put(key, value);
+    if (!s.ok()) {
+      memtable_->FlushWal();
+      memtable_->SetDeferFlush(false);
+      return s;
+    }
+  }
+
+  // 批次结束，flush WAL 并恢复默认模式
+  memtable_->FlushWal();
+  memtable_->SetDeferFlush(false);
+
+  return Status::OK();
+}
+
 Status LSMTree::Remove(const Slice &key) {
   return Insert(key, Slice{});
 }

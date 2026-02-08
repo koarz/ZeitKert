@@ -37,6 +37,10 @@ public:
     return impl_.Put(key, value);
   }
 
+  void SetDeferFlush(bool defer) { impl_.SetDeferFlush(defer); }
+
+  void FlushWal() { impl_.FlushWal(); }
+
   Status Get(const Slice &key, Slice *value) { return impl_.Get(key, value); }
 
   void RecoverFromWal() {} // VectorizedMemTable 在构造时自动恢复
