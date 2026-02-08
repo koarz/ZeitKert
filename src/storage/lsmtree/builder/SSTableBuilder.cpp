@@ -272,7 +272,17 @@ public:
       offset += meta.columns.back().size;
     }
 
+    // 写入 key 列数据（固定 4 字节 int 或 8 字节 double，或变长 string）
     if (!keys_.empty()) {
+      meta.key_column_offset = static_cast<uint32_t>(offset);
+      // 假设所有 key 大小一致（int 或 double），使用第一个 key 的大小
+      uint32_t key_size = static_cast<uint32_t>(keys_[0].Size());
+      for (auto &k : keys_) {
+        data.append(reinterpret_cast<const char *>(k.GetData()), k.Size());
+      }
+      meta.key_column_size = static_cast<uint32_t>(keys_.size() * key_size);
+      offset += meta.key_column_size;
+
       // Bloom 仅覆盖主键 key
       BloomFilterBuilder bloom_builder(keys_.size());
       for (auto &k : keys_) {

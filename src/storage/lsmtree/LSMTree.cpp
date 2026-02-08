@@ -7,6 +7,8 @@
 #include "storage/column/ColumnVector.hpp"
 #include "storage/lsmtree/BloomFilter.hpp"
 #include "storage/lsmtree/ColumnReader.hpp"
+#include "storage/lsmtree/CompactionScheduler.hpp"
+#include "storage/lsmtree/Manifest.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/RowCodec.hpp"
 #include "storage/lsmtree/SelectionVector.hpp"
@@ -20,7 +22,6 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
-#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -93,25 +94,99 @@ static bool BuildRowFromRowGroup(
   return true;
 }
 
+// 类型感知的 key 比较
+static int CompareKeys(const Byte *a_ptr, uint32_t a_len, const Byte *b_ptr,
+                       uint32_t b_len, ValueType::Type key_type) {
+  switch (key_type) {
+  case ValueType::Type::Int: {
+    // 直接比较整数值，而非字节
+    if (a_len != sizeof(int) || b_len != sizeof(int)) {
+      return static_cast<int>(a_len) - static_cast<int>(b_len);
+    }
+    int a_val = 0, b_val = 0;
+    std::memcpy(&a_val, a_ptr, sizeof(int));
+    std::memcpy(&b_val, b_ptr, sizeof(int));
+    if (a_val < b_val)
+      return -1;
+    if (a_val > b_val)
+      return 1;
+    return 0;
+  }
+  case ValueType::Type::Double: {
+    if (a_len != sizeof(double) || b_len != sizeof(double)) {
+      return static_cast<int>(a_len) - static_cast<int>(b_len);
+    }
+    double a_val = 0.0, b_val = 0.0;
+    std::memcpy(&a_val, a_ptr, sizeof(double));
+    std::memcpy(&b_val, b_ptr, sizeof(double));
+    if (a_val < b_val)
+      return -1;
+    if (a_val > b_val)
+      return 1;
+    return 0;
+  }
+  case ValueType::Type::String:
+  default: {
+    // 字符串使用字节比较
+    size_t min_len =
+        std::min(static_cast<size_t>(a_len), static_cast<size_t>(b_len));
+    int res = std::memcmp(a_ptr, b_ptr, min_len);
+    if (res != 0)
+      return res;
+    return static_cast<int>(a_len) - static_cast<int>(b_len);
+  }
+  }
+}
+
+// 从 key 列获取指定行的 key
+static bool GetKeyFromKeyColumn(const Byte *base, const RowGroupMeta &rg,
+                                uint32_t row_idx, ValueType::Type key_type,
+                                const Byte *&ptr, uint32_t &len) {
+  if (row_idx >= rg.row_count || rg.key_column_size == 0) {
+    return false;
+  }
+  switch (key_type) {
+  case ValueType::Type::Int:
+    len = sizeof(int);
+    ptr = base + rg.key_column_offset + row_idx * sizeof(int);
+    return true;
+  case ValueType::Type::Double:
+    len = sizeof(double);
+    ptr = base + rg.key_column_offset + row_idx * sizeof(double);
+    return true;
+  case ValueType::Type::String:
+    // 字符串 key 需要不同处理，暂不支持
+    return false;
+  case ValueType::Type::Null: return false;
+  }
+  return false;
+}
+
 static bool FindRowIndex(const Byte *base, const RowGroupMeta &rg,
                          const Slice &key, ValueType::Type key_type,
                          uint16_t key_idx, uint32_t &row_idx) {
   if (rg.row_count == 0) {
     return false;
   }
-  // RowGroup 内按主键二分查找
-  SliceCompare cmp;
+
+  // 使用 key 列进行二分查找（如果存在）
+  bool use_key_column = (rg.key_column_size > 0);
+
   int left = 0;
   int right = static_cast<int>(rg.row_count) - 1;
+
   while (left <= right) {
     int mid = left + (right - left) / 2;
     const Byte *ptr = nullptr;
     uint32_t len = 0;
-    if (!GetColumnValuePointer(base, rg, mid, key_idx, key_type, ptr, len)) {
+    bool got =
+        use_key_column
+            ? GetKeyFromKeyColumn(base, rg, mid, key_type, ptr, len)
+            : GetColumnValuePointer(base, rg, mid, key_idx, key_type, ptr, len);
+    if (!got) {
       return false;
     }
-    Slice mid_key{const_cast<Byte *>(ptr), static_cast<uint16_t>(len)};
-    int res = cmp(mid_key, key);
+    int res = CompareKeys(ptr, len, key.GetData(), key.Size(), key_type);
     if (res == 0) {
       row_idx = static_cast<uint32_t>(mid);
       return true;
@@ -131,6 +206,36 @@ static std::filesystem::path MakeWalPath(const std::filesystem::path &base,
   return base / fmt::format("{}.wal", id);
 }
 
+// 从 SSTable 提取 min/max key
+static void ExtractSSTableKeyRange(const SSTableRef &sstable,
+                                   std::string &min_key, std::string &max_key) {
+  min_key.clear();
+  max_key.clear();
+  if (!sstable || sstable->rowgroups_.empty()) {
+    return;
+  }
+
+  // max_key 使用最后一个 rowgroup 的 max_key
+  max_key = sstable->rowgroups_.back().max_key;
+
+  // min_key 优先使用 zone map 的 min
+  const auto &first_rg = sstable->rowgroups_.front();
+  auto pk_idx = sstable->primary_key_idx_;
+  if (pk_idx < first_rg.columns.size() &&
+      first_rg.columns[pk_idx].zone.has_value) {
+    min_key = first_rg.columns[pk_idx].zone.min;
+  } else {
+    // fallback: 使用第一个 rowgroup 的 max_key 的第一个 key
+    // 实际上 SSTable 是排序的，所以第一个 rowgroup 的 max_key 前面的数据就是
+    // min 但我们没有存储 min_key，所以用 max_key 作为近似
+    // 更好的方法是使用第一行的 key，但这需要读取数据
+    if (!first_rg.columns.empty() && first_rg.columns[0].zone.has_value) {
+      // 使用第一列的 zone min 作为估计（可能不准确但至少有值）
+      min_key = first_rg.columns[0].zone.min;
+    }
+  }
+}
+
 LSMTree::LSMTree(std::filesystem::path table_path,
                  std::shared_ptr<BufferPoolManager> buffer_pool_manager,
                  std::vector<std::shared_ptr<ValueType>> column_types,
@@ -145,6 +250,15 @@ LSMTree::LSMTree(std::filesystem::path table_path,
   } else if (primary_key_idx_ >= column_types_.size()) {
     primary_key_idx_ = 0;
   }
+
+  // 初始化 levels
+  levels_.resize(MAX_LEVELS);
+  for (uint32_t i = 0; i < MAX_LEVELS; i++) {
+    levels_[i].level_num = i;
+  }
+
+  // 创建 manifest
+  manifest_ = std::make_unique<Manifest>(column_path_);
 
   // 收集所有 WAL 文件的 id
   std::vector<std::pair<uint32_t, std::filesystem::path>> wal_files;
@@ -183,6 +297,26 @@ LSMTree::LSMTree(std::filesystem::path table_path,
     }
   }
 
+  // 加载 manifest 并重建 level 信息
+  auto manifest_status = manifest_->Load(levels_);
+  if (!manifest_status.ok()) {
+    // manifest 不存在或损坏，将所有 SSTable 放入 L0
+    for (auto &[id, sstable] : sstables_) {
+      std::string min_key, max_key;
+      ExtractSSTableKeyRange(sstable, min_key, max_key);
+      auto file_path = column_path_ / fmt::format("{}.sst", id);
+      uint64_t file_size = 0;
+      if (std::filesystem::exists(file_path)) {
+        file_size = std::filesystem::file_size(file_path);
+      }
+      LeveledSSTableMeta meta(id, 0, min_key, max_key, file_size);
+      levels_[0].AddSSTable(meta);
+    }
+  }
+
+  // 从已知最大 ID 初始化 next_table_id_
+  next_table_id_.store(table_number_);
+
   // 按 id 排序 WAL 文件
   std::sort(wal_files.begin(), wal_files.end());
 
@@ -209,9 +343,18 @@ LSMTree::LSMTree(std::filesystem::path table_path,
       immutable_table_.push_back(std::move(mem));
     }
   }
+
+  // 创建并启动 compaction 调度器
+  compaction_scheduler_ = std::make_unique<CompactionScheduler>(this);
+  compaction_scheduler_->Start();
 }
 
 LSMTree::~LSMTree() {
+  // 先停止 compaction 调度器
+  if (compaction_scheduler_) {
+    compaction_scheduler_->Stop();
+  }
+
   // 逐个刷盘所有 immutable tables，并删除对应的 WAL 文件
   while (!immutable_table_.empty()) {
     auto &imm = immutable_table_.front();
@@ -224,15 +367,48 @@ LSMTree::~LSMTree() {
     std::vector<MemTableRef> to_flush;
     to_flush.push_back(std::move(imm));
     immutable_table_.erase(immutable_table_.begin());
-    auto &table_meta = sstables_[table_number_] = std::make_shared<SSTable>();
-    table_meta->sstable_id_ = table_number_;
-    std::ignore = TableOperator::BuildSSTable(column_path_, table_number_,
-                                              to_flush, column_types_,
-                                              primary_key_idx_, table_meta);
+
+    auto sstable_id = GetNextTableId();
+    auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
+    table_meta->sstable_id_ = sstable_id;
+
+    uint32_t out_id = sstable_id;
+    std::ignore = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
+                                              column_types_, primary_key_idx_,
+                                              table_meta);
+
+    // 添加到 L0
+    AddToL0(sstable_id, table_meta);
+
     // 刷盘后删除 WAL 文件
     for (auto &mem : to_flush) {
       mem->DeleteWal();
     }
+  }
+
+  // 保存 manifest
+  if (manifest_) {
+    std::ignore = manifest_->Save(levels_);
+  }
+}
+
+void LSMTree::AddToL0(uint32_t sstable_id, const SSTableRef &sstable) {
+  std::string min_key, max_key;
+  ExtractSSTableKeyRange(sstable, min_key, max_key);
+
+  auto file_path = column_path_ / fmt::format("{}.sst", sstable_id);
+  uint64_t file_size = 0;
+  if (std::filesystem::exists(file_path)) {
+    file_size = std::filesystem::file_size(file_path);
+  }
+
+  std::unique_lock<std::shared_mutex> lock(level_latch_);
+  LeveledSSTableMeta meta(sstable_id, 0, min_key, max_key, file_size);
+  levels_[0].AddSSTable(meta);
+
+  // 更新 manifest
+  if (manifest_) {
+    std::ignore = manifest_->AddSSTable(0, meta);
   }
 }
 
@@ -246,7 +422,7 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   auto size = memtable_->GetApproximateSize();
   // MemTable 到达 SSTable 大小后转不可变
   if (size >= SSTABLE_SIZE) {
-    std::unique_lock lock(immutable_latch_);
+    std::unique_lock imm_lock(immutable_latch_);
     memtable_->ToImmutable();
     immutable_table_.push_back(std::move(memtable_));
     if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
@@ -254,18 +430,30 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
       std::vector<MemTableRef> to_flush;
       to_flush.push_back(std::move(immutable_table_.front()));
       immutable_table_.erase(immutable_table_.begin());
-      auto sstable_id = table_number_;
+
+      auto sstable_id = GetNextTableId();
       auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
       table_meta->sstable_id_ = sstable_id;
-      auto s = TableOperator::BuildSSTable(column_path_, table_number_,
-                                           to_flush, column_types_,
-                                           primary_key_idx_, table_meta);
+
+      uint32_t out_id = sstable_id;
+      auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
+                                           column_types_, primary_key_idx_,
+                                           table_meta);
       if (!s.ok()) {
         return s;
       }
+
+      // 添加到 L0
+      AddToL0(sstable_id, table_meta);
+
       // 刷盘后删除 WAL 文件
       for (auto &mem : to_flush) {
         mem->DeleteWal();
+      }
+
+      // 触发 compaction 检查
+      if (compaction_scheduler_) {
+        compaction_scheduler_->MaybeScheduleCompaction();
       }
     }
     // 创建新的 memtable，使用新的 WAL 序号
@@ -304,28 +492,41 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
       return Status::OK();
     }
   }
+  lock2.unlock();
 
-  SliceCompare cmp;
-  // SSTable 按 max_key 二分定位 RowGroup
-  for (int i = static_cast<int>(table_number_) - 1; i >= 0; i--) {
-    auto it = sstables_.find(i);
-    if (it == sstables_.end()) {
-      continue;
+  // 获取主键类型，用于类型感知比较
+  auto pk_type = column_types_[primary_key_idx_]->GetType();
+
+  // 搜索 SSTable（所有文件，从新到旧）
+  // 先收集所有 SSTable 引用（持有 latch_ 保护）
+  std::vector<std::pair<uint32_t, SSTableRef>> sst_to_search;
+  {
+    std::shared_lock sst_lock(latch_);
+    for (const auto &[id, sst] : sstables_) {
+      if (sst && sst->data_file_ && sst->data_file_->Valid() &&
+          !sst->rowgroups_.empty()) {
+        sst_to_search.emplace_back(id, sst);
+      }
     }
-    auto &table = *it->second;
-    if (!table.data_file_ || !table.data_file_->Valid()) {
-      continue;
-    }
-    if (table.rowgroups_.empty()) {
-      continue;
-    }
+  }
+
+  // 按 ID 降序排序（最新的优先）
+  std::sort(sst_to_search.begin(), sst_to_search.end(),
+            [](const auto &a, const auto &b) { return a.first > b.first; });
+
+  for (const auto &[id, sst_ref] : sst_to_search) {
+    auto &table = *sst_ref;
+
+    // SSTable 按 max_key 二分定位 RowGroup，使用类型感知比较
     int left = 0;
     int right = static_cast<int>(table.rowgroups_.size()) - 1;
     int candidate = -1;
     while (left <= right) {
       int mid = left + (right - left) / 2;
-      Slice max_key{table.rowgroups_[mid].max_key};
-      int res = cmp(max_key, key);
+      const auto &max_key_str = table.rowgroups_[mid].max_key;
+      int res = CompareKeys(reinterpret_cast<const Byte *>(max_key_str.data()),
+                            static_cast<uint32_t>(max_key_str.size()),
+                            key.GetData(), key.Size(), pk_type);
       if (res >= 0) {
         candidate = mid;
         right = mid - 1;
@@ -333,6 +534,7 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
         left = mid + 1;
       }
     }
+
     if (candidate < 0) {
       continue;
     }
@@ -360,6 +562,7 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
     }
     return Status::OK();
   }
+
   return Status::Error(ErrorCode::NotFound, "The key no mapping any value");
 }
 
@@ -995,15 +1198,20 @@ Status LSMTree::FlushToSST() {
     to_flush.push_back(std::move(imm));
     immutable_table_.erase(immutable_table_.begin());
 
-    auto &table_meta = sstables_[table_number_] = std::make_shared<SSTable>();
-    table_meta->sstable_id_ = table_number_;
+    auto sstable_id = GetNextTableId();
+    auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
+    table_meta->sstable_id_ = sstable_id;
 
-    auto s = TableOperator::BuildSSTable(column_path_, table_number_, to_flush,
+    uint32_t out_id = sstable_id;
+    auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
                                          column_types_, primary_key_idx_,
                                          table_meta);
     if (!s.ok()) {
       return s;
     }
+
+    // 添加到 L0
+    AddToL0(sstable_id, table_meta);
 
     // 刷盘后删除 WAL 文件
     for (auto &mem : to_flush) {
@@ -1011,6 +1219,95 @@ Status LSMTree::FlushToSST() {
     }
   }
 
+  // 触发 compaction 检查
+  if (compaction_scheduler_) {
+    compaction_scheduler_->MaybeScheduleCompaction();
+  }
+
   return Status::OK();
 }
+
+SSTableRef LSMTree::GetSSTable(uint32_t id) {
+  auto it = sstables_.find(id);
+  if (it == sstables_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
+
+void LSMTree::RegisterSSTable(uint32_t id, SSTableRef sstable) {
+  std::unique_lock<std::shared_mutex> lock(latch_);
+  sstables_[id] = std::move(sstable);
+}
+
+uint32_t LSMTree::GetNextTableId() {
+  return next_table_id_.fetch_add(1);
+}
+
+Status LSMTree::InstallCompactionResults(
+    const CompactionJob &job, const std::vector<uint32_t> &new_sstable_ids) {
+  // 先获取 latch_，再获取 level_latch_（保持锁顺序一致，避免死锁）
+  std::unique_lock<std::shared_mutex> sst_lock(latch_);
+  std::unique_lock<std::shared_mutex> level_lock(level_latch_);
+
+  // 从各层移除旧文件
+  for (uint32_t id : job.input_sstables) {
+    levels_[job.input_level].RemoveSSTable(id);
+    if (manifest_) {
+      std::ignore = manifest_->RemoveSSTable(job.input_level, id);
+    }
+  }
+
+  for (uint32_t id : job.output_sstables) {
+    levels_[job.output_level].RemoveSSTable(id);
+    if (manifest_) {
+      std::ignore = manifest_->RemoveSSTable(job.output_level, id);
+    }
+  }
+
+  // 删除旧 SSTable 并从 sstables_ 中移除
+  // 跳过同时在 new_sstable_ids 中的 ID（trivial move 时文件不变）
+  std::vector<uint32_t> all_old_ids;
+  all_old_ids.insert(all_old_ids.end(), job.input_sstables.begin(),
+                     job.input_sstables.end());
+  all_old_ids.insert(all_old_ids.end(), job.output_sstables.begin(),
+                     job.output_sstables.end());
+
+  std::vector<uint32_t> ids_to_delete;
+  for (uint32_t id : all_old_ids) {
+    if (std::find(new_sstable_ids.begin(), new_sstable_ids.end(), id) ==
+        new_sstable_ids.end()) {
+      ids_to_delete.push_back(id);
+    }
+  }
+
+  for (uint32_t id : ids_to_delete) {
+    sstables_.erase(id);
+  }
+
+  // 释放锁后删除文件
+  level_lock.unlock();
+  sst_lock.unlock();
+
+  for (uint32_t id : ids_to_delete) {
+    auto file_path = column_path_ / fmt::format("{}.sst", id);
+    std::error_code ec;
+    std::filesystem::remove(file_path, ec);
+  }
+
+  return Status::OK();
+}
+
+void LSMTree::TriggerCompaction() {
+  if (compaction_scheduler_) {
+    compaction_scheduler_->MaybeScheduleCompaction();
+  }
+}
+
+size_t LSMTree::GetL0FileCount() const {
+  std::shared_lock<std::shared_mutex> lock(
+      const_cast<std::shared_mutex &>(level_latch_));
+  return levels_[0].sstables.size();
+}
+
 } // namespace DB

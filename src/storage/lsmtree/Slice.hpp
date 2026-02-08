@@ -84,7 +84,7 @@ public:
 };
 
 struct SliceCompare {
-  int operator()(const Slice &l, const Slice &r) {
+  int operator()(const Slice &l, const Slice &r) const {
     size_t min_size = std::min(l.Size(), r.Size());
     int res = memcmp(l.GetData(), r.GetData(), min_size);
     if (res == 0) {

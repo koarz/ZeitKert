@@ -33,3 +33,15 @@ constexpr size_t DEFAULT_ROWGROUP_ALIGNMENT = 4096;
 constexpr size_t MAX_IMMUTABLE_COUNT = 4;
 #endif
 constexpr size_t ZONE_MAP_PREFIX_LEN = 32;
+
+// Leveled Compaction constants
+constexpr uint32_t MAX_LEVELS = 7;
+#ifdef TESTS
+constexpr uint32_t L0_COMPACTION_THRESHOLD = 4;
+constexpr double LEVEL_SIZE_MULTIPLIER = 10.0;
+constexpr uint64_t L1_MAX_BYTES = 64 * 1024; // 64KB for tests
+#else
+constexpr uint32_t L0_COMPACTION_THRESHOLD = 4;
+constexpr double LEVEL_SIZE_MULTIPLIER = 10.0;
+constexpr uint64_t L1_MAX_BYTES = 512ULL * 1024 * 1024; // 512MB
+#endif

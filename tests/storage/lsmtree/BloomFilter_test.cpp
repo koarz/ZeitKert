@@ -20,7 +20,7 @@ TEST(BloomFilterTest, AddedKeysMatch) {
   BloomFilterBuilder builder(keys.size());
   for (const auto &key : keys) {
     Slice slice(key);
-    builder.AddKey(&slice);
+    builder.AddKey(slice);
   }
 
   BloomFilter filter(builder.GetData());
@@ -36,7 +36,7 @@ TEST(BloomFilterTest, ByteInterfaceMatches) {
   BloomFilterBuilder builder(keys.size());
   for (const auto &key : keys) {
     Slice slice(key);
-    builder.AddKey(&slice);
+    builder.AddKey(slice);
   }
 
   BloomFilter filter(reinterpret_cast<const Byte *>(builder.GetData().data()),
@@ -103,7 +103,7 @@ TEST(BloomFilterTest, ResetSwitchesData) {
   using namespace DB;
   BloomFilterBuilder builder(1);
   Slice key("alpha");
-  builder.AddKey(&key);
+  builder.AddKey(key);
 
   BloomFilter filter(builder.GetData());
   EXPECT_TRUE(filter.MayContain(key));

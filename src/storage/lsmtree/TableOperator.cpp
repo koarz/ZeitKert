@@ -27,8 +27,15 @@ Status TableOperator::BuildSSTable(
     iters.push_back(
         std::make_shared<MemTableIterator>((*it)->MakeNewIterator()));
   }
-  MergeIterator iter(std::move(iters));
+  // 获取主键类型用于正确比较
+  auto pk_type = column_types[primary_key_idx]->GetType();
+  MergeIterator iter(std::move(iters), pk_type);
   while (iter.Valid()) {
+    // 跳过 tombstone（删除标记，value 为空）
+    if (iter.GetValue().Size() == 0) {
+      iter.Next();
+      continue;
+    }
     if (builder.Add(iter.GetKey(), iter.GetValue()) == false) {
       break;
     }

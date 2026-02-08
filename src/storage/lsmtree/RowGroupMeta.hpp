@@ -28,6 +28,9 @@ struct RowGroupMeta {
   std::vector<ColumnChunkMeta> columns;
   std::string bloom;
   std::string max_key;
+  // 新增：key 列的偏移和大小（相对于 RowGroup 数据起始）
+  uint32_t key_column_offset = 0;
+  uint32_t key_column_size = 0;
 
   void Serialize(const std::vector<std::shared_ptr<ValueType>> &types,
                  std::string &out) const {
@@ -104,6 +107,9 @@ struct RowGroupMeta {
     if (key_size > 0) {
       out.append(max_key.data(), max_key.size());
     }
+    // 新增：key 列偏移和大小
+    append(key_column_offset);
+    append(key_column_size);
   }
 
   static bool Deserialize(const Byte *&p, const Byte *end,
@@ -218,6 +224,14 @@ struct RowGroupMeta {
     }
     out.max_key.assign(reinterpret_cast<const char *>(p), key_size);
     p += key_size;
+
+    // 新增：读取 key 列偏移和大小
+    if (!read(out.key_column_offset)) {
+      return false;
+    }
+    if (!read(out.key_column_size)) {
+      return false;
+    }
     return true;
   }
 };

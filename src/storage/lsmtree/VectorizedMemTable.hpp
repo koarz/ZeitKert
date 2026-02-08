@@ -448,11 +448,43 @@ public:
     Iterator(const VectorizedMemTable *table, size_t idx, size_t end)
         : table_(table), idx_(idx), end_(end) {}
 
+    // 跳到当前 key 的最后一个条目（最高 seq，最新版本）
+    void SkipToLastOfCurrentKey() {
+      if (idx_ >= end_)
+        return;
+      switch (table_->key_type_) {
+      case ValueType::Type::Int: {
+        int cur_key = table_->int_entries_[idx_].key;
+        while (idx_ + 1 < end_ &&
+               table_->int_entries_[idx_ + 1].key == cur_key) {
+          ++idx_;
+        }
+        break;
+      }
+      default: {
+        auto cur_key =
+            table_->GetStringKeyAt(table_->string_entries_[idx_].key_offset,
+                                   table_->string_entries_[idx_].key_len);
+        while (idx_ + 1 < end_) {
+          auto next_key = table_->GetStringKeyAt(
+              table_->string_entries_[idx_ + 1].key_offset,
+              table_->string_entries_[idx_ + 1].key_len);
+          if (next_key != cur_key)
+            break;
+          ++idx_;
+        }
+        break;
+      }
+      }
+    }
+
     bool Valid() const { return idx_ < end_; }
 
     void Next() {
       if (Valid()) {
         ++idx_;
+        // 跳到下一个不同 key 的最后一个条目（去重）
+        SkipToLastOfCurrentKey();
         cache_valid_ = false;
       }
     }
@@ -499,7 +531,9 @@ public:
 
   Iterator MakeIterator() const {
     EnsureSorted();
-    return Iterator(this, 0, Count());
+    Iterator it(this, 0, Count());
+    it.SkipToLastOfCurrentKey(); // 初始化时跳到第一个 key 的最新版本
+    return it;
   }
 };
 

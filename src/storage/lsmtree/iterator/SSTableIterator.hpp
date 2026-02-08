@@ -39,6 +39,23 @@ class SSTableIterator : public Iterator {
     const Byte *base =
         sstable_->data_file_->Data() + static_cast<size_t>(rg.offset);
     row_buffer_.clear();
+
+    // 首先从 key 列读取 key（如果存在）
+    if (rg.key_column_size > 0) {
+      auto pk_type = column_types_[primary_key_idx_]->GetType();
+      uint32_t key_len = 0;
+      if (pk_type == ValueType::Type::Int) {
+        key_len = sizeof(int);
+      } else if (pk_type == ValueType::Type::Double) {
+        key_len = sizeof(double);
+      }
+      if (key_len > 0) {
+        const Byte *key_ptr = base + rg.key_column_offset + row_idx_ * key_len;
+        key_ =
+            Slice{const_cast<Byte *>(key_ptr), static_cast<uint16_t>(key_len)};
+      }
+    }
+
     for (size_t col_idx = 0; col_idx < rg.columns.size(); col_idx++) {
       const auto &col = rg.columns[col_idx];
       auto type = column_types_[col_idx]->GetType();
@@ -58,7 +75,8 @@ class SSTableIterator : public Iterator {
           row_buffer_.append(reinterpret_cast<const char *>(data_base + start),
                              len);
         }
-        if (col_idx == primary_key_idx_) {
+        // 只有在没有 key 列时才从 primary_key_idx_ 读取 key
+        if (col_idx == primary_key_idx_ && rg.key_column_size == 0) {
           key_ = Slice{const_cast<Byte *>(data_base + start),
                        static_cast<uint16_t>(len)};
         }
@@ -75,7 +93,8 @@ class SSTableIterator : public Iterator {
         if (len > 0) {
           row_buffer_.append(reinterpret_cast<const char *>(data_ptr), len);
         }
-        if (col_idx == primary_key_idx_) {
+        // 只有在没有 key 列时才从 primary_key_idx_ 读取 key
+        if (col_idx == primary_key_idx_ && rg.key_column_size == 0) {
           key_ =
               Slice{const_cast<Byte *>(data_ptr), static_cast<uint16_t>(len)};
         }

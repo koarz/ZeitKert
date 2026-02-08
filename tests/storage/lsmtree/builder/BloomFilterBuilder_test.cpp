@@ -34,7 +34,7 @@ TEST(BloomFilterBuilderTest, AddKeySetsExpectedBitsInBlock) {
   }
 
   Slice key("hello");
-  builder.AddKey(&key);
+  builder.AddKey(key);
 
   const std::string &data = builder.GetData();
   ASSERT_EQ(data.size() % kBlockBytes, 0U);
