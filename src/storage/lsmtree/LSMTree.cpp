@@ -1,5 +1,6 @@
 #include "storage/lsmtree/LSMTree.hpp"
 #include "common/Config.hpp"
+#include "common/Logger.hpp"
 #include "common/Status.hpp"
 #include "fmt/format.h"
 #include "storage/column/Column.hpp"
@@ -422,10 +423,12 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   auto size = memtable_->GetApproximateSize();
   // MemTable 到达 SSTable 大小后转不可变
   if (size >= SSTABLE_SIZE) {
+    LOG_INFO("MemTable full (size={}), converting to immutable", size);
     std::unique_lock imm_lock(immutable_latch_);
     memtable_->ToImmutable();
     immutable_table_.push_back(std::move(memtable_));
     if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
+      LOG_INFO("Immutable buffer full, flushing oldest to SSTable");
       // 缓冲区满，刷最老的 immutable 为 SSTable
       std::vector<MemTableRef> to_flush;
       to_flush.push_back(std::move(immutable_table_.front()));
@@ -477,6 +480,7 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
     if (value->Size() == 0) {
       return Status::Error(ErrorCode::NotFound, "The key no mapping any value");
     }
+    LOG_DEBUG("GetValue: found in MemTable");
     return Status::OK();
   }
   lock.unlock();
@@ -489,6 +493,7 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
         return Status::Error(ErrorCode::NotFound,
                              "The key no mapping any value");
       }
+      LOG_DEBUG("GetValue: found in Immutable MemTable");
       return Status::OK();
     }
   }
@@ -560,6 +565,7 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
     if (value->Size() == 0) {
       return Status::Error(ErrorCode::NotFound, "The key no mapping any value");
     }
+    LOG_DEBUG("GetValue: found in SSTable {}", id);
     return Status::OK();
   }
 
@@ -1167,6 +1173,7 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
 }
 
 Status LSMTree::FlushToSST() {
+  LOG_INFO("FlushToSST: starting flush");
   std::unique_lock lock(latch_);
   std::unique_lock imm_lock(immutable_latch_);
 
@@ -1210,6 +1217,8 @@ Status LSMTree::FlushToSST() {
       return s;
     }
 
+    LOG_INFO("FlushToSST: flushed to SSTable {}", sstable_id);
+
     // 添加到 L0
     AddToL0(sstable_id, table_meta);
 
@@ -1224,6 +1233,7 @@ Status LSMTree::FlushToSST() {
     compaction_scheduler_->MaybeScheduleCompaction();
   }
 
+  LOG_INFO("FlushToSST: flush completed");
   return Status::OK();
 }
 
@@ -1246,6 +1256,10 @@ uint32_t LSMTree::GetNextTableId() {
 
 Status LSMTree::InstallCompactionResults(
     const CompactionJob &job, const std::vector<uint32_t> &new_sstable_ids) {
+  LOG_INFO("InstallCompactionResults: L{} -> L{}, removing {} input + {} "
+           "output files, adding {} new files",
+           job.input_level, job.output_level, job.input_sstables.size(),
+           job.output_sstables.size(), new_sstable_ids.size());
   // 先获取 latch_，再获取 level_latch_（保持锁顺序一致，避免死锁）
   std::unique_lock<std::shared_mutex> sst_lock(latch_);
   std::unique_lock<std::shared_mutex> level_lock(level_latch_);

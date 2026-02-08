@@ -2,6 +2,7 @@
 
 #include "common/Context.hpp"
 #include "common/EnumClass.hpp"
+#include "common/Logger.hpp"
 #include "common/ResultSet.hpp"
 #include "common/Status.hpp"
 #include "execution/ExecutionEngine.hpp"
@@ -28,6 +29,7 @@ class ZeitKert {
 
 public:
   ZeitKert();
+  ~ZeitKert();
 
   Status ExecuteQuery(std::string &query, ResultSet &result_set) {
     query.pop_back();
@@ -45,23 +47,32 @@ public:
     context_->sql_statement_ = stmt;
     switch (stmt->type) {
     case StatementType::CreateStatement:
+      LOG_INFO("Execute: CREATE statement");
       status = HandleCreateStatement();
       goto ExecuteEnd;
     case StatementType::UseStatement:
+      LOG_INFO("Execute: USE statement");
       status = HandleUseStatement();
       goto ExecuteEnd;
     case StatementType::ShowStatement:
+      LOG_INFO("Execute: SHOW statement");
       status = HandleShowStatement(result_set);
       goto ExecuteEnd;
     case StatementType::DropStatement:
+      LOG_INFO("Execute: DROP statement");
       status = HandleDropStatement();
       goto ExecuteEnd;
     case StatementType::FlushStatement:
+      LOG_INFO("Execute: FLUSH statement");
       status = HandleFlushStatement();
       goto ExecuteEnd;
     case StatementType::InvalidStatement:
     case StatementType::SelectStatement:
-    case StatementType::InsertStatement: break;
+      LOG_INFO("Execute: SELECT statement");
+      break;
+    case StatementType::InsertStatement:
+      LOG_INFO("Execute: INSERT statement");
+      break;
     }
 
     status = planner.QueryPlan();

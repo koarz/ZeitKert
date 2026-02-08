@@ -66,7 +66,7 @@ struct CompactionJob {
   uint32_t output_level;
   std::vector<uint32_t> input_sstables;  // 输入层的 SSTable ID
   std::vector<uint32_t> output_sstables; // 输出层重叠的 SSTable ID
-  bool is_trivial_move{false}; // 若为 true，直接移动文件无需重写
+  bool is_trivial_move{false};           // 若为 true，直接移动文件无需重写
 };
 
 } // namespace DB

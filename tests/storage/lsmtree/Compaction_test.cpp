@@ -49,8 +49,8 @@ TEST_F(CompactionTest, L0CompactionTrigger) {
   // Write enough data to trigger multiple flushes to L0
   // In test mode, SSTABLE_SIZE = 8192 bytes
   // Each row with an int key and int value is small, so we need many rows
-  const int rows_per_flush = 500;  // Should be enough to fill a memtable
-  const int num_flushes = 6;       // More than L0_COMPACTION_THRESHOLD (4)
+  const int rows_per_flush = 500; // Should be enough to fill a memtable
+  const int num_flushes = 6;      // More than L0_COMPACTION_THRESHOLD (4)
 
   for (int flush = 0; flush < num_flushes; flush++) {
     for (int i = 0; i < rows_per_flush; i++) {
@@ -330,8 +330,7 @@ TEST_F(CompactionTest, TombstoneCleanupValueIntegrity) {
   // 插入数据 value = key * 7
   for (int i = 0; i < total_keys; i++) {
     std::string row;
-    RowCodec::AppendValue(row, ValueType::Type::Int,
-                          std::to_string(i * 7));
+    RowCodec::AppendValue(row, ValueType::Type::Int, std::to_string(i * 7));
     EXPECT_TRUE(lsm.Insert(Slice{i}, Slice{row}).ok());
   }
 
@@ -348,11 +347,9 @@ TEST_F(CompactionTest, TombstoneCleanupValueIntegrity) {
   for (int i = 0; i < total_keys; i++) {
     Slice row;
     if (i % 2 == 0) {
-      EXPECT_FALSE(lsm.GetValue(Slice{i}, &row).ok())
-          << "deleted key=" << i;
+      EXPECT_FALSE(lsm.GetValue(Slice{i}, &row).ok()) << "deleted key=" << i;
     } else {
-      EXPECT_TRUE(lsm.GetValue(Slice{i}, &row).ok())
-          << "missing key=" << i;
+      EXPECT_TRUE(lsm.GetValue(Slice{i}, &row).ok()) << "missing key=" << i;
       Slice val;
       EXPECT_TRUE(RowCodec::DecodeColumn(row, 0, &val));
       int v = 0;
@@ -385,8 +382,7 @@ TEST_F(CompactionTest, MultiRoundOverwriteCompaction) {
   // 第二轮：覆盖所有 key，value = i + 1000
   for (int i = 0; i < total_keys; i++) {
     std::string row;
-    RowCodec::AppendValue(row, ValueType::Type::Int,
-                          std::to_string(i + 1000));
+    RowCodec::AppendValue(row, ValueType::Type::Int, std::to_string(i + 1000));
     EXPECT_TRUE(lsm.Insert(Slice{i}, Slice{row}).ok());
   }
   EXPECT_TRUE(lsm.FlushToSST().ok());
@@ -396,8 +392,7 @@ TEST_F(CompactionTest, MultiRoundOverwriteCompaction) {
   // 验证：所有 key 的 value 都是 i + 1000
   for (int i = 0; i < total_keys; i++) {
     Slice row;
-    EXPECT_TRUE(lsm.GetValue(Slice{i}, &row).ok())
-        << "missing key=" << i;
+    EXPECT_TRUE(lsm.GetValue(Slice{i}, &row).ok()) << "missing key=" << i;
     Slice val;
     EXPECT_TRUE(RowCodec::DecodeColumn(row, 0, &val));
     int v = 0;
@@ -433,8 +428,7 @@ TEST_F(CompactionTest, DeleteReinsertCompaction) {
   // 重新插入偶数 key，value = i + 2000
   for (int i = 0; i < total_keys; i += 2) {
     std::string row;
-    RowCodec::AppendValue(row, ValueType::Type::Int,
-                          std::to_string(i + 2000));
+    RowCodec::AppendValue(row, ValueType::Type::Int, std::to_string(i + 2000));
     EXPECT_TRUE(lsm.Insert(Slice{i}, Slice{row}).ok());
   }
 

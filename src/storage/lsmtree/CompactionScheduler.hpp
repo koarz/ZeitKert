@@ -17,9 +17,8 @@ class LSMTree;
 
 class CompactionScheduler {
 public:
-  using InstallCallback =
-      std::function<Status(const CompactionJob &job,
-                           const std::vector<uint32_t> &new_sstable_ids)>;
+  using InstallCallback = std::function<Status(
+      const CompactionJob &job, const std::vector<uint32_t> &new_sstable_ids)>;
 
   CompactionScheduler(LSMTree *tree);
   ~CompactionScheduler();

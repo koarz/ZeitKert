@@ -138,10 +138,9 @@ Status Manifest::Save(const std::vector<LevelMeta> &levels) {
 Status Manifest::AddSSTable(uint32_t level, const LeveledSSTableMeta &meta) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  std::string record =
-      fmt::format("{} {} {} {} {} {}", kAddRecord, level, meta.sstable_id,
-                  meta.file_size, EncodeHex(meta.min_key),
-                  EncodeHex(meta.max_key));
+  std::string record = fmt::format(
+      "{} {} {} {} {} {}", kAddRecord, level, meta.sstable_id, meta.file_size,
+      EncodeHex(meta.min_key), EncodeHex(meta.max_key));
 
   return AppendRecord(record);
 }
@@ -149,8 +148,7 @@ Status Manifest::AddSSTable(uint32_t level, const LeveledSSTableMeta &meta) {
 Status Manifest::RemoveSSTable(uint32_t level, uint32_t sstable_id) {
   std::lock_guard<std::mutex> lock(mutex_);
 
-  std::string record =
-      fmt::format("{} {} {}", kDelRecord, level, sstable_id);
+  std::string record = fmt::format("{} {} {}", kDelRecord, level, sstable_id);
 
   return AppendRecord(record);
 }

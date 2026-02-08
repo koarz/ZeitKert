@@ -1,5 +1,6 @@
 #include "storage/lsmtree/CompactionScheduler.hpp"
 #include "common/Config.hpp"
+#include "common/Logger.hpp"
 #include "fmt/format.h"
 #include "storage/lsmtree/LSMTree.hpp"
 #include "storage/lsmtree/Manifest.hpp"
@@ -23,7 +24,9 @@ CompactionScheduler::CompactionScheduler(LSMTree *tree) : tree_(tree) {
   }
 }
 
-CompactionScheduler::~CompactionScheduler() { Stop(); }
+CompactionScheduler::~CompactionScheduler() {
+  Stop();
+}
 
 void CompactionScheduler::Start() {
   if (running_.load()) {
@@ -63,6 +66,7 @@ void CompactionScheduler::MaybeScheduleCompaction() {
 }
 
 void CompactionScheduler::BackgroundThread() {
+  LOG_INFO("Compaction background thread started");
   while (!stop_requested_.load()) {
     std::unique_lock<std::mutex> lock(mutex_);
 
@@ -145,9 +149,13 @@ void CompactionScheduler::BackgroundThread() {
       }
     }
   }
+  LOG_INFO("Compaction background thread stopped");
 }
 
 Status CompactionScheduler::DoCompaction(CompactionJob &job) {
+  LOG_INFO("DoCompaction: L{} -> L{}, input_files={}, output_files={}",
+           job.input_level, job.output_level, job.input_sstables.size(),
+           job.output_sstables.size());
   // 收集输入 SSTable 的迭代器
   std::vector<std::shared_ptr<Iterator>> iters;
 
@@ -195,8 +203,7 @@ Status CompactionScheduler::DoCompaction(CompactionJob &job) {
 
   // 创建合并用的迭代器 - 较新的表在前（输入层的表较新）
   for (auto &sstable : input_tables) {
-    iters.push_back(
-        std::make_shared<SSTableIterator>(sstable, column_types));
+    iters.push_back(std::make_shared<SSTableIterator>(sstable, column_types));
   }
 
   // 创建合并迭代器，传入主键类型以进行正确比较
@@ -237,7 +244,7 @@ Status CompactionScheduler::DoCompaction(CompactionJob &job) {
            level++) {
         for (auto &meta : levels[level].sstables) {
           if (picker_.KeyRangesOverlap(min_key, max_key, meta.min_key,
-                                                 meta.max_key)) {
+                                       meta.max_key)) {
             no_overlap_below = false;
             break;
           }
@@ -249,12 +256,18 @@ Status CompactionScheduler::DoCompaction(CompactionJob &job) {
   }
 
   bool can_drop_tombstone = is_bottom_level || no_overlap_below;
+  if (can_drop_tombstone) {
+    LOG_INFO("DoCompaction: tombstone cleanup enabled (bottom_level={}, "
+             "no_overlap_below={})",
+             is_bottom_level, no_overlap_below);
+  }
 
   // 构建新的 SSTable
   uint32_t new_table_id = tree_->GetNextTableId();
   std::vector<uint32_t> new_sstable_ids;
 
-  auto builder = std::make_unique<SSTableBuilder>(path, new_table_id, column_types, primary_key_idx);
+  auto builder = std::make_unique<SSTableBuilder>(
+      path, new_table_id, column_types, primary_key_idx);
 
   std::string current_min_key;
   std::string current_max_key;
@@ -309,7 +322,8 @@ Status CompactionScheduler::DoCompaction(CompactionJob &job) {
 
       // 开始新 SSTable
       new_table_id = tree_->GetNextTableId();
-      builder = std::make_unique<SSTableBuilder>(path, new_table_id, column_types, primary_key_idx);
+      builder = std::make_unique<SSTableBuilder>(path, new_table_id,
+                                                 column_types, primary_key_idx);
 
       current_min_key = key_str;
       current_max_key = key_str;
@@ -351,6 +365,8 @@ Status CompactionScheduler::DoCompaction(CompactionJob &job) {
   }
 
   // 安装 compaction 结果（删除旧文件，更新 manifest）
+  LOG_INFO("DoCompaction: completed, produced {} new SSTable(s)",
+           new_sstable_ids.size());
   return tree_->InstallCompactionResults(job, new_sstable_ids);
 }
 

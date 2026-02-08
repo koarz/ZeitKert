@@ -11,9 +11,8 @@
 #include "linenoise.h"
 
 int main(int argc, char *argv[]) {
-  DB::Logger::Init("./logs/zeitkert.log");
-
   DB::ZeitKert db;
+  LOG_INFO("ZeitKert started");
   int num{};
 
   linenoiseHistorySetMaxLen(1024);
@@ -60,7 +59,7 @@ int main(int argc, char *argv[]) {
               << "\n\n";
   }
 
+  LOG_INFO("ZeitKert shutting down");
   std::cout << "Bye.\n";
-  DB::Logger::Shutdown();
   return 0;
 }

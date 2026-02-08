@@ -1,5 +1,6 @@
 #include "storage/lsmtree/TableOperator.hpp"
 #include "common/Config.hpp"
+#include "common/Logger.hpp"
 #include "common/Status.hpp"
 #include "fmt/format.h"
 #include "storage/lsmtree/Slice.hpp"
@@ -46,6 +47,8 @@ Status TableOperator::BuildSSTable(
   table_id++;
   auto s = builder.Finish();
   sstable_meta = builder.BuildSSTableMeta();
+  LOG_INFO("BuildSSTable: table_id={}, rowgroups={}", sstable_meta->sstable_id_,
+           sstable_meta->rowgroups_.size());
   return s;
 }
 
@@ -163,6 +166,9 @@ Status TableOperator::ReadSSTable(
   sstable_meta->column_count_ = column_count;
   sstable_meta->primary_key_idx_ = primary_key_idx;
   sstable_meta->data_file_ = std::make_shared<MMapFile>(path);
+  LOG_INFO("ReadSSTable: id={}, rowgroups={}, columns={}, pk_idx={}",
+           sstable_meta->sstable_id_, rowgroup_count, column_count,
+           primary_key_idx);
   return Status::OK();
 }
 } // namespace DB

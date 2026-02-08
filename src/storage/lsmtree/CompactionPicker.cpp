@@ -7,7 +7,8 @@
 namespace DB {
 
 // 类型感知的 key 比较
-int CompactionPicker::CompareKeys(const std::string &a, const std::string &b) const {
+int CompactionPicker::CompareKeys(const std::string &a,
+                                  const std::string &b) const {
   switch (key_type_) {
   case ValueType::Type::Int: {
     if (a.size() != sizeof(int) || b.size() != sizeof(int)) {
@@ -16,8 +17,10 @@ int CompactionPicker::CompareKeys(const std::string &a, const std::string &b) co
     int a_val = 0, b_val = 0;
     std::memcpy(&a_val, a.data(), sizeof(int));
     std::memcpy(&b_val, b.data(), sizeof(int));
-    if (a_val < b_val) return -1;
-    if (a_val > b_val) return 1;
+    if (a_val < b_val)
+      return -1;
+    if (a_val > b_val)
+      return 1;
     return 0;
   }
   case ValueType::Type::Double: {
@@ -27,13 +30,14 @@ int CompactionPicker::CompareKeys(const std::string &a, const std::string &b) co
     double a_val = 0.0, b_val = 0.0;
     std::memcpy(&a_val, a.data(), sizeof(double));
     std::memcpy(&b_val, b.data(), sizeof(double));
-    if (a_val < b_val) return -1;
-    if (a_val > b_val) return 1;
+    if (a_val < b_val)
+      return -1;
+    if (a_val > b_val)
+      return 1;
     return 0;
   }
   case ValueType::Type::String:
-  default:
-    return a.compare(b);
+  default: return a.compare(b);
   }
 }
 
@@ -127,7 +131,8 @@ CompactionPicker::PickLevelCompaction(std::vector<LevelMeta> &levels,
     if (meta.being_compacted) {
       continue;
     }
-    if (candidate == nullptr || CompareKeys(meta.min_key, candidate->min_key) < 0) {
+    if (candidate == nullptr ||
+        CompareKeys(meta.min_key, candidate->min_key) < 0) {
       candidate = &meta;
     }
   }
@@ -142,9 +147,8 @@ CompactionPicker::PickLevelCompaction(std::vector<LevelMeta> &levels,
   job.input_sstables.push_back(candidate->sstable_id);
 
   // 查找下一层中重叠的文件
-  job.output_sstables =
-      FindOverlappingFiles(levels[level + 1], candidate->min_key,
-                           candidate->max_key);
+  job.output_sstables = FindOverlappingFiles(
+      levels[level + 1], candidate->min_key, candidate->max_key);
 
   // 检查下一层重叠文件是否正在 compaction
   for (uint32_t id : job.output_sstables) {
