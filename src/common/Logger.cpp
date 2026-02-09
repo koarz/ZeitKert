@@ -16,7 +16,7 @@ void Logger::Init(const std::string &log_file) {
     std::filesystem::create_directories(log_path.parent_path());
   }
   auto file_sink =
-      std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file, true);
+      std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file, false);
   g_logger = std::make_shared<spdlog::logger>("zeitkert", file_sink);
   // 设置格式：[2026-01-23 13:00:00.000] [INFO] [file:line] message
   g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %v");
