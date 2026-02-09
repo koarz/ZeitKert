@@ -47,12 +47,12 @@ int main(int argc, char *argv[]) {
         return 0;
       }
       query += query_c_str;
+      linenoiseFree(query_c_str);
       if (DB::StringUtil::EndsWith(query, ";") ||
           DB::StringUtil::StartsWith(query, "\\")) {
         break;
       }
       query += " ";
-      linenoiseFree(query_c_str);
       first_line = false;
     }
     if (query == "quit;" || query == "exit;") {

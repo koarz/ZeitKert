@@ -6,6 +6,12 @@ set_version("0.1")
 add_includedirs("src")
 set_toolchains("clang")
 
+if is_mode("asan") then
+    set_symbols("debug")
+    set_optimize("none")
+    set_policy("build.sanitizer.address", true)
+end
+
 add_requires("linenoise", "simdjson", "rapidjson", "gtest", "fmt 12.1.0",
              "spdlog v1.17.0", "xxhash")
 
