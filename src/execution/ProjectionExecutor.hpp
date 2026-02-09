@@ -4,6 +4,9 @@
 #include "common/Status.hpp"
 #include "execution/AbstractExecutor.hpp"
 
+#include <thread>
+#include <vector>
+
 namespace DB {
 class ProjectionExecutor : public AbstractExecutor {
   std::vector<AbstractExecutorRef> children_;

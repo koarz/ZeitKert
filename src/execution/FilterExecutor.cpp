@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <memory>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 namespace DB {
@@ -61,15 +62,38 @@ static ColumnPtr FilterColumnData(const ColumnPtr &col,
 }
 
 Status FilterExecutor::ScanConditionColumns() {
-  for (auto &col_scan : condition_columns_) {
-    auto &lsm = col_scan.lsm_tree;
-    auto &col_meta = col_scan.column_meta;
-    uint32_t col_idx = col_scan.column_idx;
-
-    ColumnPtr col_data;
-    std::ignore = lsm->ScanColumn(col_idx, col_data);
-    condition_column_data_[col_meta->name_] = col_data;
+  // 按 LSMTree 指针分组 condition_columns_
+  std::unordered_map<LSMTree *, std::vector<std::pair<size_t, size_t>>>
+      lsm_groups; // lsm -> [(col_idx, index in condition_columns_)]
+  for (size_t i = 0; i < condition_columns_.size(); i++) {
+    auto &col_scan = condition_columns_[i];
+    lsm_groups[col_scan.lsm_tree.get()].emplace_back(col_scan.column_idx, i);
   }
+
+  // 对每组调用 ScanColumns 一次
+  for (auto &[lsm_ptr, col_pairs] : lsm_groups) {
+    std::vector<size_t> column_indices;
+    column_indices.reserve(col_pairs.size());
+    for (auto &[col_idx, orig_idx] : col_pairs) {
+      column_indices.push_back(col_idx);
+    }
+
+    // 找到对应的 shared_ptr（从第一个匹配的 condition_columns_ 取）
+    auto &lsm = condition_columns_[col_pairs[0].second].lsm_tree;
+
+    std::vector<ColumnPtr> results;
+    auto s = lsm->ScanColumns(column_indices, results);
+    if (!s.ok()) {
+      return s;
+    }
+
+    // 将结果映射回 condition_column_data_
+    for (size_t i = 0; i < col_pairs.size(); i++) {
+      auto &col_meta = condition_columns_[col_pairs[i].second].column_meta;
+      condition_column_data_[col_meta->name_] = results[i];
+    }
+  }
+
   return Status::OK();
 }
 

@@ -17,6 +17,7 @@
 #include <map>
 #include <memory>
 #include <shared_mutex>
+#include <thread>
 #include <vector>
 
 namespace DB {
@@ -52,6 +53,19 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   SelectionVector BuildSelectionVectorInt();
   SelectionVector BuildSelectionVectorString();
 
+  // 基于已构建的 SelectionVector 读取单列数据
+  void ReadColumnWithSV(size_t column_idx,
+                        const std::shared_ptr<ValueType> &type,
+                        const SelectionVector &sv, ColumnPtr &res);
+
+  // 检查内存中是否有数据（memtable + immutable）
+  bool HasInMemoryData() const;
+
+  // 快速路径：直接从 SSTable 读取列，跳过 BuildSelectionVector
+  void ScanColumnFromSSTables(size_t column_idx,
+                              const std::shared_ptr<ValueType> &type,
+                              ColumnPtr &res);
+
   // 刷盘后将新 SSTable 加入 L0
   void AddToL0(uint32_t sstable_id, const SSTableRef &sstable);
 
@@ -73,6 +87,10 @@ public:
   Status GetValue(const Slice &key, Slice *column) override;
 
   Status ScanColumn(size_t column_idx, ColumnPtr &res);
+
+  // 多列并行扫描：BuildSelectionVector 只构建一次，多列读取并行执行
+  Status ScanColumns(const std::vector<size_t> &column_indices,
+                     std::vector<ColumnPtr> &results);
 
   // 构建去重后的 SelectionVector
   SelectionVector BuildSelectionVector();

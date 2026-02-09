@@ -5,6 +5,7 @@
 #include "function/Abs.hpp"
 #include "function/FunctionCast.hpp"
 #include "function/FunctionCount.hpp"
+#include "function/FunctionSimdSum.hpp"
 #include "function/FunctionString.hpp"
 #include "function/FunctionSum.hpp"
 #include "parser/Checker.hpp"
@@ -54,6 +55,7 @@ static void RegisterChecker() {
   Checker::RegisterFunction("CAST", std::make_shared<FunctionCast>());
   Checker::RegisterFunction("COUNT", std::make_shared<FunctionCount>());
   Checker::RegisterFunction("SUM", std::make_shared<FunctionSum>());
+  Checker::RegisterFunction("SIMD_SUM", std::make_shared<FunctionSimdSum>());
   Checker::RegisterFunction("TO_UPPER", std::make_shared<FunctionToUpper>());
   Checker::RegisterFunction("TO_LOWER", std::make_shared<FunctionToLower>());
 }

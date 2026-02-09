@@ -23,6 +23,7 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <vector>
 
@@ -652,6 +653,103 @@ Status LSMTree::GetValue(const Slice &key, Slice *value) {
   return Status::Error(ErrorCode::NotFound, "The key no mapping any value");
 }
 
+// 根据类型创建空列容器
+static ColumnPtr MakeEmptyColumn(ValueType::Type t) {
+  switch (t) {
+  case ValueType::Type::Int: return std::make_shared<ColumnVector<int>>();
+  case ValueType::Type::String: return std::make_shared<ColumnString>();
+  case ValueType::Type::Double: return std::make_shared<ColumnVector<double>>();
+  default: return nullptr;
+  }
+}
+
+// 预分配列容量
+static void ReserveColumn(ColumnPtr &col, ValueType::Type t, size_t n) {
+  switch (t) {
+  case ValueType::Type::Int:
+    static_cast<ColumnVector<int> *>(col.get())->Reserve(n);
+    break;
+  case ValueType::Type::Double:
+    static_cast<ColumnVector<double> *>(col.get())->Reserve(n);
+    break;
+  case ValueType::Type::String:
+    static_cast<ColumnString *>(col.get())->Reserve(n);
+    break;
+  default: break;
+  }
+}
+
+// 检查内存中是否有数据（memtable + immutable）
+bool LSMTree::HasInMemoryData() const {
+  if (memtable_->GetImpl().Count() > 0) {
+    return true;
+  }
+  for (auto &imm : immutable_table_) {
+    if (imm->GetImpl().Count() > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// 快速路径：直接从所有 SSTable 读取列，跳过 BuildSelectionVector
+// Int/Double 列使用零拷贝 span（直接引用 mmap 指针），String 列仍需拷贝
+void LSMTree::ScanColumnFromSSTables(size_t column_idx,
+                                     const std::shared_ptr<ValueType> &type,
+                                     ColumnPtr &res) {
+  auto col_type = type->GetType();
+
+  // String 列仍需拷贝（变长格式），预分配容量
+  if (col_type == ValueType::Type::String) {
+    size_t total_rows = 0;
+    for (auto &[id, sst] : sstables_) {
+      if (sst->data_file_ && sst->data_file_->Valid()) {
+        for (auto &rg : sst->rowgroups_) {
+          total_rows += rg.row_count;
+        }
+      }
+    }
+    ReserveColumn(res, col_type, total_rows);
+  }
+
+  // 从新到旧读取（与 BuildSelectionVector 顺序一致）
+  for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
+    auto &[id, sst] = *it;
+    if (!sst->data_file_ || !sst->data_file_->Valid())
+      continue;
+
+    const Byte *file_base = sst->data_file_->Data();
+
+    for (const auto &rg : sst->rowgroups_) {
+      if (rg.row_count == 0 || column_idx >= rg.columns.size())
+        continue;
+      const Byte *rg_base = file_base + static_cast<size_t>(rg.offset);
+
+      switch (col_type) {
+      case ValueType::Type::Int: {
+        const Byte *col_data = rg_base + rg.columns[column_idx].offset;
+        static_cast<ColumnVector<int> *>(res.get())->AddSpan(
+            reinterpret_cast<const int *>(col_data), rg.row_count,
+            sst->data_file_);
+        break;
+      }
+      case ValueType::Type::Double: {
+        const Byte *col_data = rg_base + rg.columns[column_idx].offset;
+        static_cast<ColumnVector<double> *>(res.get())->AddSpan(
+            reinterpret_cast<const double *>(col_data), rg.row_count,
+            sst->data_file_);
+        break;
+      }
+      case ValueType::Type::String:
+        ColumnReader::ReadColumnFromRowGroup(rg, rg_base, column_idx, type,
+                                             res);
+        break;
+      default: break;
+      }
+    }
+  }
+}
+
 Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
   if (column_idx >= column_types_.size()) {
     return Status::Error(ErrorCode::NotFound, "Column index out of range");
@@ -659,21 +757,29 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
 
   auto type = column_types_[column_idx];
 
-  // 创建列容器
-  switch (type->GetType()) {
-  case ValueType::Type::Int: res = std::make_shared<ColumnVector<int>>(); break;
-  case ValueType::Type::String: res = std::make_shared<ColumnString>(); break;
-  case ValueType::Type::Double:
-    res = std::make_shared<ColumnVector<double>>();
-    break;
-  case ValueType::Type::Null: return Status::OK();
+  res = MakeEmptyColumn(type->GetType());
+  if (!res) {
+    return Status::OK();
   }
 
   std::shared_lock lock1(latch_), lock2(immutable_latch_);
 
-  // 构建去重后的 SelectionVector
-  auto sv = BuildSelectionVector();
+  // 快速路径：内存中无数据时跳过 BuildSelectionVector
+  if (!HasInMemoryData()) {
+    ScanColumnFromSSTables(column_idx, type, res);
+    return Status::OK();
+  }
 
+  // 常规路径
+  auto sv = BuildSelectionVector();
+  ReadColumnWithSV(column_idx, type, sv, res);
+
+  return Status::OK();
+}
+
+void LSMTree::ReadColumnWithSV(size_t column_idx,
+                               const std::shared_ptr<ValueType> &type,
+                               const SelectionVector &sv, ColumnPtr &res) {
   // 预分配容量减少重分配
   size_t total_rows = sv.TotalRows();
   switch (type->GetType()) {
@@ -818,6 +924,100 @@ Status LSMTree::ScanColumn(size_t column_idx, ColumnPtr &res) {
                                             res);
       break;
     }
+    }
+  }
+}
+
+Status LSMTree::ScanColumns(const std::vector<size_t> &column_indices,
+                            std::vector<ColumnPtr> &results) {
+  results.resize(column_indices.size());
+
+  // 验证所有列索引
+  for (size_t i = 0; i < column_indices.size(); i++) {
+    if (column_indices[i] >= column_types_.size()) {
+      return Status::Error(ErrorCode::NotFound, "Column index out of range");
+    }
+  }
+
+  std::shared_lock lock1(latch_), lock2(immutable_latch_);
+
+  // 快速路径：内存中无数据时跳过 BuildSelectionVector
+  bool fast_path = !HasInMemoryData();
+
+  // 为每列创建结果容器
+  for (size_t i = 0; i < column_indices.size(); i++) {
+    auto type = column_types_[column_indices[i]];
+    results[i] = MakeEmptyColumn(type->GetType());
+  }
+
+  if (fast_path) {
+    // 直接从 SSTable 读取，跳过 SelectionVector
+    if (column_indices.size() <= 1) {
+      if (!column_indices.empty() && results[0]) {
+        ScanColumnFromSSTables(column_indices[0],
+                               column_types_[column_indices[0]], results[0]);
+      }
+    } else {
+      size_t num_threads = std::min(column_indices.size(), size_t{8});
+      std::vector<std::thread> threads;
+      threads.reserve(num_threads);
+
+      for (size_t i = 0; i < column_indices.size(); i++) {
+        if (!results[i])
+          continue;
+        auto type = column_types_[column_indices[i]];
+        threads.emplace_back([this, i, &column_indices, &type, &results]() {
+          ScanColumnFromSSTables(column_indices[i], type, results[i]);
+        });
+
+        if (threads.size() >= 8) {
+          for (auto &t : threads)
+            t.join();
+          threads.clear();
+        }
+      }
+      for (auto &t : threads)
+        t.join();
+    }
+    return Status::OK();
+  }
+
+  // 常规路径：构建 SelectionVector
+  auto sv = BuildSelectionVector();
+
+  if (column_indices.size() <= 1) {
+    // 单列直接读取
+    if (!column_indices.empty() &&
+        column_types_[column_indices[0]]->GetType() != ValueType::Type::Null) {
+      ReadColumnWithSV(column_indices[0], column_types_[column_indices[0]], sv,
+                       results[0]);
+    }
+  } else {
+    // 多列并行读取，上限 8 线程
+    size_t num_threads = std::min(column_indices.size(), size_t{8});
+    std::vector<std::thread> threads;
+    threads.reserve(num_threads);
+
+    for (size_t i = 0; i < column_indices.size(); i++) {
+      auto type = column_types_[column_indices[i]];
+      if (type->GetType() == ValueType::Type::Null) {
+        continue;
+      }
+      threads.emplace_back([this, i, &column_indices, &type, &sv, &results]() {
+        ReadColumnWithSV(column_indices[i], type, sv, results[i]);
+      });
+
+      // 达到线程上限时等待所有完成再继续
+      if (threads.size() >= 8) {
+        for (auto &t : threads) {
+          t.join();
+        }
+        threads.clear();
+      }
+    }
+
+    for (auto &t : threads) {
+      t.join();
     }
   }
 

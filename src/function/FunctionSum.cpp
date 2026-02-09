@@ -37,15 +37,32 @@ Status FunctionSum::ExecuteImpl(Block &block, size_t result_idx,
   switch (input_type) {
   case ValueType::Type::Int: {
     auto &col = static_cast<ColumnVector<int> &>(*input_col->GetColumn());
-    for (size_t i = 0; i < input_rows_count; i++) {
-      sum += col[i];
+    if (col.HasSpans()) {
+      // 零拷贝路径：直接从 mmap 指针求和
+      for (const auto &span : col.Spans()) {
+        for (size_t i = 0; i < span.count; i++) {
+          sum += span.ptr[i];
+        }
+      }
+    } else {
+      for (size_t i = 0; i < input_rows_count; i++) {
+        sum += col[i];
+      }
     }
     break;
   }
   case ValueType::Type::Double: {
     auto &col = static_cast<ColumnVector<double> &>(*input_col->GetColumn());
-    for (size_t i = 0; i < input_rows_count; i++) {
-      sum += col[i];
+    if (col.HasSpans()) {
+      for (const auto &span : col.Spans()) {
+        for (size_t i = 0; i < span.count; i++) {
+          sum += span.ptr[i];
+        }
+      }
+    } else {
+      for (size_t i = 0; i < input_rows_count; i++) {
+        sum += col[i];
+      }
     }
     break;
   }

@@ -99,9 +99,7 @@ Status InsertExecutor::Execute() {
               RowCodec::AppendString(row_buffer, v);
               break;
             }
-            case ValueType::Type::Null:
-              RowCodec::AppendNull(row_buffer);
-              break;
+            case ValueType::Type::Null: RowCodec::AppendNull(row_buffer); break;
             }
           }
 
