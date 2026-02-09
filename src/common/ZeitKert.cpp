@@ -5,6 +5,7 @@
 #include "function/Abs.hpp"
 #include "function/FunctionCast.hpp"
 #include "function/FunctionCount.hpp"
+#include "function/FunctionMath.hpp"
 #include "function/FunctionSimdSum.hpp"
 #include "function/FunctionString.hpp"
 #include "function/FunctionSum.hpp"
@@ -58,6 +59,32 @@ static void RegisterChecker() {
   Checker::RegisterFunction("SIMD_SUM", std::make_shared<FunctionSimdSum>());
   Checker::RegisterFunction("TO_UPPER", std::make_shared<FunctionToUpper>());
   Checker::RegisterFunction("TO_LOWER", std::make_shared<FunctionToLower>());
+  Checker::RegisterFunction(
+      "SQRT", std::make_shared<FunctionMath>(FunctionMath::MathOp::Sqrt));
+  Checker::RegisterFunction(
+      "SIN", std::make_shared<FunctionMath>(FunctionMath::MathOp::Sin));
+  Checker::RegisterFunction(
+      "COS", std::make_shared<FunctionMath>(FunctionMath::MathOp::Cos));
+  Checker::RegisterFunction(
+      "TAN", std::make_shared<FunctionMath>(FunctionMath::MathOp::Tan));
+  Checker::RegisterFunction(
+      "ASIN", std::make_shared<FunctionMath>(FunctionMath::MathOp::Asin));
+  Checker::RegisterFunction(
+      "ACOS", std::make_shared<FunctionMath>(FunctionMath::MathOp::Acos));
+  Checker::RegisterFunction(
+      "ATAN", std::make_shared<FunctionMath>(FunctionMath::MathOp::Atan));
+  Checker::RegisterFunction(
+      "LOG", std::make_shared<FunctionMath>(FunctionMath::MathOp::Log));
+  Checker::RegisterFunction(
+      "LOG10", std::make_shared<FunctionMath>(FunctionMath::MathOp::Log10));
+  Checker::RegisterFunction(
+      "EXP", std::make_shared<FunctionMath>(FunctionMath::MathOp::Exp));
+  Checker::RegisterFunction(
+      "CEIL", std::make_shared<FunctionMath>(FunctionMath::MathOp::Ceil));
+  Checker::RegisterFunction(
+      "FLOOR", std::make_shared<FunctionMath>(FunctionMath::MathOp::Floor));
+  Checker::RegisterFunction(
+      "ROUND", std::make_shared<FunctionMath>(FunctionMath::MathOp::Round));
 }
 
 ZeitKert::ZeitKert() : context_(std::make_shared<QueryContext>()) {
