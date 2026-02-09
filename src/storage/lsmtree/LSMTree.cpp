@@ -966,7 +966,7 @@ Status LSMTree::ScanColumns(const std::vector<size_t> &column_indices,
         if (!results[i])
           continue;
         auto type = column_types_[column_indices[i]];
-        threads.emplace_back([this, i, &column_indices, &type, &results]() {
+        threads.emplace_back([this, i, &column_indices, type, &results]() {
           ScanColumnFromSSTables(column_indices[i], type, results[i]);
         });
 
@@ -1003,7 +1003,7 @@ Status LSMTree::ScanColumns(const std::vector<size_t> &column_indices,
       if (type->GetType() == ValueType::Type::Null) {
         continue;
       }
-      threads.emplace_back([this, i, &column_indices, &type, &sv, &results]() {
+      threads.emplace_back([this, i, &column_indices, type, &sv, &results]() {
         ReadColumnWithSV(column_indices[i], type, sv, results[i]);
       });
 
