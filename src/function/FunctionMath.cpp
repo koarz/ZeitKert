@@ -39,17 +39,17 @@ static bool MathTryGetNumeric(const ColumnWithNameTypeRef &column, size_t row,
 
 static double ApplyMathOp(FunctionMath::MathOp op, double v) {
   switch (op) {
-  case FunctionMath::MathOp::Sqrt:  return std::sqrt(v);
-  case FunctionMath::MathOp::Sin:   return std::sin(v);
-  case FunctionMath::MathOp::Cos:   return std::cos(v);
-  case FunctionMath::MathOp::Tan:   return std::tan(v);
-  case FunctionMath::MathOp::Asin:  return std::asin(v);
-  case FunctionMath::MathOp::Acos:  return std::acos(v);
-  case FunctionMath::MathOp::Atan:  return std::atan(v);
-  case FunctionMath::MathOp::Log:   return std::log(v);
+  case FunctionMath::MathOp::Sqrt: return std::sqrt(v);
+  case FunctionMath::MathOp::Sin: return std::sin(v);
+  case FunctionMath::MathOp::Cos: return std::cos(v);
+  case FunctionMath::MathOp::Tan: return std::tan(v);
+  case FunctionMath::MathOp::Asin: return std::asin(v);
+  case FunctionMath::MathOp::Acos: return std::acos(v);
+  case FunctionMath::MathOp::Atan: return std::atan(v);
+  case FunctionMath::MathOp::Log: return std::log(v);
   case FunctionMath::MathOp::Log10: return std::log10(v);
-  case FunctionMath::MathOp::Exp:   return std::exp(v);
-  case FunctionMath::MathOp::Ceil:  return std::ceil(v);
+  case FunctionMath::MathOp::Exp: return std::exp(v);
+  case FunctionMath::MathOp::Ceil: return std::ceil(v);
   case FunctionMath::MathOp::Floor: return std::floor(v);
   case FunctionMath::MathOp::Round: return std::round(v);
   }
@@ -58,17 +58,17 @@ static double ApplyMathOp(FunctionMath::MathOp op, double v) {
 
 static std::string MathOpName(FunctionMath::MathOp op) {
   switch (op) {
-  case FunctionMath::MathOp::Sqrt:  return "SQRT";
-  case FunctionMath::MathOp::Sin:   return "SIN";
-  case FunctionMath::MathOp::Cos:   return "COS";
-  case FunctionMath::MathOp::Tan:   return "TAN";
-  case FunctionMath::MathOp::Asin:  return "ASIN";
-  case FunctionMath::MathOp::Acos:  return "ACOS";
-  case FunctionMath::MathOp::Atan:  return "ATAN";
-  case FunctionMath::MathOp::Log:   return "LOG";
+  case FunctionMath::MathOp::Sqrt: return "SQRT";
+  case FunctionMath::MathOp::Sin: return "SIN";
+  case FunctionMath::MathOp::Cos: return "COS";
+  case FunctionMath::MathOp::Tan: return "TAN";
+  case FunctionMath::MathOp::Asin: return "ASIN";
+  case FunctionMath::MathOp::Acos: return "ACOS";
+  case FunctionMath::MathOp::Atan: return "ATAN";
+  case FunctionMath::MathOp::Log: return "LOG";
   case FunctionMath::MathOp::Log10: return "LOG10";
-  case FunctionMath::MathOp::Exp:   return "EXP";
-  case FunctionMath::MathOp::Ceil:  return "CEIL";
+  case FunctionMath::MathOp::Exp: return "EXP";
+  case FunctionMath::MathOp::Ceil: return "CEIL";
   case FunctionMath::MathOp::Floor: return "FLOOR";
   case FunctionMath::MathOp::Round: return "ROUND";
   }

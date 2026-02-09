@@ -35,7 +35,8 @@ public:
 
   ~SSTableBuilder();
 
-  [[nodiscard]] bool Add(const Slice &key, const Slice &row);
+  [[nodiscard]]
+  bool Add(const Slice &key, const Slice &row);
 
   Status Finish();
 

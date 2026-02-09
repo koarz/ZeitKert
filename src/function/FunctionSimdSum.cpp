@@ -9,7 +9,7 @@
 namespace DB {
 
 // AVX2 SIMD 求和 double：4 个累加器 × 4 double = 每次处理 16 个 double
-__attribute__((target("avx2")))
+[[gnu::target("avx2")]]
 static double SimdSumDouble(const double *data, size_t n) {
   size_t i = 0;
 
@@ -52,7 +52,7 @@ static double SimdSumDouble(const double *data, size_t n) {
 }
 
 // AVX2 SIMD 求和 int→double：load 4 int → cvt → add as double
-__attribute__((target("avx2")))
+[[gnu::target("avx2")]]
 static double SimdSumInt(const int *data, size_t n) {
   size_t i = 0;
 
@@ -62,15 +62,15 @@ static double SimdSumInt(const int *data, size_t n) {
   __m256d acc3 = _mm256_setzero_pd();
 
   for (; i + 16 <= n; i += 16) {
-    acc0 = _mm256_add_pd(
-        acc0, _mm256_cvtepi32_pd(_mm_loadu_si128(
-                  reinterpret_cast<const __m128i *>(data + i))));
-    acc1 = _mm256_add_pd(
-        acc1, _mm256_cvtepi32_pd(_mm_loadu_si128(
-                  reinterpret_cast<const __m128i *>(data + i + 4))));
-    acc2 = _mm256_add_pd(
-        acc2, _mm256_cvtepi32_pd(_mm_loadu_si128(
-                  reinterpret_cast<const __m128i *>(data + i + 8))));
+    acc0 =
+        _mm256_add_pd(acc0, _mm256_cvtepi32_pd(_mm_loadu_si128(
+                                reinterpret_cast<const __m128i *>(data + i))));
+    acc1 = _mm256_add_pd(acc1,
+                         _mm256_cvtepi32_pd(_mm_loadu_si128(
+                             reinterpret_cast<const __m128i *>(data + i + 4))));
+    acc2 = _mm256_add_pd(acc2,
+                         _mm256_cvtepi32_pd(_mm_loadu_si128(
+                             reinterpret_cast<const __m128i *>(data + i + 8))));
     acc3 = _mm256_add_pd(
         acc3, _mm256_cvtepi32_pd(_mm_loadu_si128(
                   reinterpret_cast<const __m128i *>(data + i + 12))));
@@ -81,9 +81,9 @@ static double SimdSumInt(const int *data, size_t n) {
   acc0 = _mm256_add_pd(acc0, acc2);
 
   for (; i + 4 <= n; i += 4) {
-    acc0 = _mm256_add_pd(
-        acc0, _mm256_cvtepi32_pd(_mm_loadu_si128(
-                  reinterpret_cast<const __m128i *>(data + i))));
+    acc0 =
+        _mm256_add_pd(acc0, _mm256_cvtepi32_pd(_mm_loadu_si128(
+                                reinterpret_cast<const __m128i *>(data + i))));
   }
 
   __m128d lo = _mm256_castpd256_pd128(acc0);

@@ -13,6 +13,7 @@ BraceWrapping:
   BeforeCatch: false
   BeforeElse: false
   IndentBraces: false
+BreakAfterAttributes: Always
 PointerAlignment: Right
 MaxEmptyLinesToKeep: 1
 ConstructorInitializerAllOnOneLineOrOnePerLine: false

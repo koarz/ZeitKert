@@ -10,8 +10,19 @@ namespace DB {
 class FunctionMath final : public Function {
 public:
   enum class MathOp {
-    Sqrt, Sin, Cos, Tan, Asin, Acos, Atan,
-    Log, Log10, Exp, Ceil, Floor, Round
+    Sqrt,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Log,
+    Log10,
+    Exp,
+    Ceil,
+    Floor,
+    Round
   };
 
   explicit FunctionMath(MathOp op);
