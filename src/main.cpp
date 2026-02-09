@@ -1,4 +1,6 @@
 #include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -10,6 +12,15 @@
 #include "common/util/StringUtil.hpp"
 #include "linenoise.h"
 
+static std::string GetHistoryPath() {
+  const char *home = std::getenv("HOME");
+  if (!home)
+    return {};
+  auto dir = std::filesystem::path(home) / ".ZeitKert";
+  std::filesystem::create_directories(dir);
+  return (dir / "history").string();
+}
+
 int main(int argc, char *argv[]) {
   DB::ZeitKert db;
   LOG_INFO("ZeitKert started");
@@ -17,6 +28,11 @@ int main(int argc, char *argv[]) {
 
   linenoiseHistorySetMaxLen(1024);
   linenoiseSetMultiLine(1);
+
+  auto history_path = GetHistoryPath();
+  if (!history_path.empty()) {
+    linenoiseHistoryLoad(history_path.c_str());
+  }
 
   std::cout << "Welcome to ZeitKert!\n\n";
 
@@ -44,6 +60,9 @@ int main(int argc, char *argv[]) {
     }
 
     linenoiseHistoryAdd(query.c_str());
+    if (!history_path.empty()) {
+      linenoiseHistorySave(history_path.c_str());
+    }
 
     DB::ResultSet res;
     const auto start = std::chrono::steady_clock::now();
