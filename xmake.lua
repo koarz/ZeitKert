@@ -13,7 +13,8 @@ if is_mode("asan") then
 end
 
 add_requires("linenoise", "simdjson", "rapidjson", "gtest", "fmt 12.1.0",
-             "spdlog v1.17.0", "xxhash")
+             "spdlog v1.17.0", "xxhash", "benchmark")
+
 
 target("libzeitkert")
     set_kind("static")
@@ -58,5 +59,13 @@ target("sqltest")
     add_deps("libzeitkert")
     add_rules("mode.debug")
     add_packages("linenoise", "simdjson", "rapidjson", "fmt", "spdlog", "xxhash")
+
+target("bench")
+    set_kind("binary")
+    add_files("benchmark/*_bench.cpp")
+    add_deps("libzeitkert")
+    add_rules("mode.release")
+    add_packages("linenoise", "simdjson", "rapidjson", "fmt", "spdlog", "xxhash",
+                 "benchmark")
 
 set_default("ZeitKert")

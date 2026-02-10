@@ -5,3 +5,4 @@ build
 AGENTS.md
 *.log
 output
+bench_results
