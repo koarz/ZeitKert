@@ -7,6 +7,7 @@
 #include "parser/ASTFlushQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
+#include "parser/ASTTableFunction.hpp"
 #include "parser/ASTShowQuery.hpp"
 #include "parser/ASTTableNames.hpp"
 #include "parser/ASTToken.hpp"
@@ -186,6 +187,23 @@ Status Parser::ParseSelect(TokenIterator &iterator) {
         while (!(++iterator)->isEnd()) {}
         where_end = iterator;
         break;
+      }
+      // detect table function: identifier(args...)
+      auto peek = iterator;
+      ++peek;
+      if (!peek->isEnd() && peek->type == TokenType::OpeningRoundBracket) {
+        std::string func_name{iterator->begin, iterator->end};
+        iterator = peek; // skip past '('
+        std::optional<TokenIterator> args_begin{++iterator};
+        // skip to matching ')'
+        while (!(iterator)->isEnd() &&
+               iterator->type != TokenType::ClosingRoundBracket) {
+          ++iterator;
+        }
+        std::optional<TokenIterator> args_end{iterator};
+        tree_->children_.emplace_back(std::make_shared<ASTTableFunction>(
+            std::move(func_name), args_begin, args_end));
+        continue;
       }
       names.emplace_back(iterator->begin, iterator->end);
     }

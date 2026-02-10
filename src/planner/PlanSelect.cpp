@@ -39,6 +39,14 @@ static void CollectColumns(const BoundExpressRef &expr,
 }
 
 Status Planner::PlanSelect(SelectStatement &satement) {
+  // Transfer range info from statement to planner
+  if (satement.range_info_) {
+    range_table_ = satement.range_table_;
+    range_start_ = satement.range_info_->start;
+    range_stop_ = satement.range_info_->stop;
+    range_step_ = satement.range_info_->step;
+  }
+
   std::vector<AbstractPlanNodeRef> columns;
   std::vector<BoundExpressRef> temp_columns;
   for (auto &column : satement.columns_) {
@@ -86,6 +94,9 @@ Status Planner::PlanSelect(SelectStatement &satement) {
     // 为需要的列创建扫描信息
     std::vector<FilterColumnScan> filter_columns;
     for (auto &table : satement.from_) {
+      if (range_table_ && table.get() == range_table_.get()) {
+        continue; // skip virtual range table
+      }
       auto lsm_tree = context_->GetOrCreateLSMTree(table);
       uint32_t col_idx = 0;
       for (auto &col_meta : table->GetColumns()) {

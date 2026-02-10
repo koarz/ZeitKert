@@ -45,6 +45,7 @@ enum class ASTNodeType {
   TableNames,
   Token,
   FlushQuery,
+  TableFunction,
 };
 
 enum class ShowType {
@@ -78,7 +79,8 @@ enum class PlanType {
   Sort,
   TopN,
   MockScan,
-  InitCheck
+  InitCheck,
+  Range
 };
 
 enum class DropType {

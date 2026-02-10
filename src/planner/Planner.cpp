@@ -9,6 +9,7 @@
 #include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
+#include "planner/RangePlanNode.hpp"
 #include "planner/ScanColumnPlanNode.hpp"
 #include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
@@ -57,6 +58,11 @@ AbstractPlanNodeRef Planner::GetPlanNode(BoundExpressRef expr) {
   case BoundExpressType::BoundColumnMeta: {
     auto &exp = static_cast<BoundColumnMeta &>(*expr);
     auto table_meta = exp.GetTableMeta();
+    if (range_table_ && table_meta.get() == range_table_.get()) {
+      return std::make_shared<RangePlanNode>(std::make_shared<Schema>(),
+                                             range_start_, range_stop_,
+                                             range_step_);
+    }
     auto lsm_tree = context_->GetOrCreateLSMTree(table_meta);
     return std::make_shared<ScanColumnPlanNode>(std::make_shared<Schema>(),
                                                 exp.GetColumnMeta(), lsm_tree,

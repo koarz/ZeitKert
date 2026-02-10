@@ -121,3 +121,26 @@ USE nonexistent_db
 # 错误测试 - 在没有选择数据库时创建表
 statement error
 CREATE TABLE test (id INT)
+
+# range function tests
+query
+SELECT * FROM range(1, 6)
+----
+1
+2
+3
+4
+5
+
+query
+SELECT * FROM range(0, 10, 3)
+----
+0
+3
+6
+9
+
+query
+SELECT COUNT(range) FROM range(1, 101)
+----
+100

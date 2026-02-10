@@ -5,6 +5,7 @@
 #include "execution/FunctionExecutor.hpp"
 #include "execution/InsertExecutor.hpp"
 #include "execution/ProjectionExecutor.hpp"
+#include "execution/RangeExecutor.hpp"
 #include "execution/ScanColumnExecutor.hpp"
 #include "execution/TupleExecutor.hpp"
 #include "execution/ValuesExecutor.hpp"
@@ -13,6 +14,7 @@
 #include "planner/FunctionPlanNode.hpp"
 #include "planner/InsertPlanNode.hpp"
 #include "planner/ProjectionPlanNode.hpp"
+#include "planner/RangePlanNode.hpp"
 #include "planner/ScanColumnPlanNode.hpp"
 #include "planner/TuplePlanNode.hpp"
 #include "planner/ValuePlanNode.hpp"
@@ -81,6 +83,11 @@ struct ExecutorFactory {
       return std::make_unique<FilterExecutor>(
           p.GetSchemaRef(), std::move(children), p.GetCondition(),
           p.GetConditionColumns());
+    }
+    case PlanType::Range: {
+      auto &p = static_cast<RangePlanNode &>(*plan);
+      return std::make_unique<RangeExecutor>(p.GetSchemaRef(), p.GetStart(),
+                                             p.GetStop(), p.GetStep());
     }
     case PlanType::IndexScan:
     case PlanType::Update:
