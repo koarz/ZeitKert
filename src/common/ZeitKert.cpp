@@ -90,6 +90,7 @@ static void RegisterChecker() {
 ZeitKert::ZeitKert() : context_(std::make_shared<QueryContext>()) {
   Logger::Init("./logs/zeitkert.log");
   RegisterChecker();
+  LOG_INFO("ZeitKert started");
 }
 
 ZeitKert::~ZeitKert() {
