@@ -23,7 +23,6 @@ static std::string GetHistoryPath() {
 
 int main(int argc, char *argv[]) {
   DB::ZeitKert db;
-  int num{};
 
   linenoiseHistorySetMaxLen(1024);
   linenoiseSetMultiLine(1);
