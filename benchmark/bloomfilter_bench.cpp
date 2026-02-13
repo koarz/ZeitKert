@@ -70,13 +70,5 @@ BENCHMARK(BM_BloomFilterBuild)
     ->Arg(10000)
     ->Arg(100000)
     ->Arg(1000000);
-BENCHMARK(BM_BloomFilterHit)
-    ->Arg(1000)
-    ->Arg(10000)
-    ->Arg(100000)
-    ->Arg(1000000);
-BENCHMARK(BM_BloomFilterMiss)
-    ->Arg(1000)
-    ->Arg(10000)
-    ->Arg(100000)
-    ->Arg(1000000);
+BENCHMARK(BM_BloomFilterHit)->Arg(1000)->Arg(10000)->Arg(100000)->Arg(1000000);
+BENCHMARK(BM_BloomFilterMiss)->Arg(1000)->Arg(10000)->Arg(100000)->Arg(1000000);

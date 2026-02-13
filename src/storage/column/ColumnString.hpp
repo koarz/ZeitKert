@@ -73,6 +73,9 @@ public:
   }
 
   std::string GetStrElement(size_t idx) override {
+    if (IsNull(idx)) {
+      return "Null";
+    }
     if (idx == offset_.size() - 1) {
       return data_.substr(offset_[idx]);
     }

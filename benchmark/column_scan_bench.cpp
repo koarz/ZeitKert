@@ -104,7 +104,8 @@ static void BM_FunctionSum(benchmark::State &state) {
 
   // Build block: [input_column, result_column]
   auto input_type = std::make_shared<Double>();
-  auto input_cwnt = std::make_shared<ColumnWithNameType>(col, "val", input_type);
+  auto input_cwnt =
+      std::make_shared<ColumnWithNameType>(col, "val", input_type);
 
   FunctionSum func;
 
@@ -112,8 +113,7 @@ static void BM_FunctionSum(benchmark::State &state) {
     Block block;
     block.PushColumn(input_cwnt);
     // Create result column
-    auto result_col =
-        std::make_shared<ColumnVector<double>>();
+    auto result_col = std::make_shared<ColumnVector<double>>();
     auto result_cwnt = std::make_shared<ColumnWithNameType>(
         result_col, "sum_result", std::make_shared<Double>());
     block.PushColumn(result_cwnt);
@@ -134,15 +134,15 @@ static void BM_FunctionSimdSum(benchmark::State &state) {
   size_t rows = col->Size();
 
   auto input_type = std::make_shared<Double>();
-  auto input_cwnt = std::make_shared<ColumnWithNameType>(col, "val", input_type);
+  auto input_cwnt =
+      std::make_shared<ColumnWithNameType>(col, "val", input_type);
 
   FunctionSimdSum func;
 
   for (auto _ : state) {
     Block block;
     block.PushColumn(input_cwnt);
-    auto result_col =
-        std::make_shared<ColumnVector<double>>();
+    auto result_col = std::make_shared<ColumnVector<double>>();
     auto result_cwnt = std::make_shared<ColumnWithNameType>(
         result_col, "simd_sum_result", std::make_shared<Double>());
     block.PushColumn(result_cwnt);

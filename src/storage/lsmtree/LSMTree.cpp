@@ -37,20 +37,35 @@ static bool GetColumnValuePointer(const Byte *base, const RowGroupMeta &rg,
     return false;
   }
   const auto &col = rg.columns[col_idx];
+
+  // 跳过 null bitmap
+  size_t bitmap_size = 0;
+  if (col.has_nulls) {
+    bitmap_size = (rg.row_count + 7) / 8;
+    // 检查该行是否为 null
+    const uint8_t *bitmap =
+        reinterpret_cast<const uint8_t *>(base + col.offset);
+    if ((bitmap[row_idx / 8] >> (row_idx % 8)) & 1) {
+      len = 0;
+      ptr = nullptr;
+      return true;
+    }
+  }
+
   switch (type) {
   case ValueType::Type::Int: {
     len = sizeof(int);
-    ptr = base + col.offset + row_idx * len;
+    ptr = base + col.offset + bitmap_size + row_idx * len;
     return true;
   }
   case ValueType::Type::Double: {
     len = sizeof(double);
-    ptr = base + col.offset + row_idx * len;
+    ptr = base + col.offset + bitmap_size + row_idx * len;
     return true;
   }
   case ValueType::Type::String: {
     // 字符串 offsets 后接 data 区
-    const Byte *offsets_base = base + col.offset;
+    const Byte *offsets_base = base + col.offset + bitmap_size;
     uint32_t start = 0;
     uint32_t end = 0;
     std::memcpy(&start, offsets_base + row_idx * sizeof(uint32_t),
@@ -728,6 +743,13 @@ void LSMTree::ScanColumnFromSSTables(size_t column_idx,
       switch (col_type) {
       case ValueType::Type::Int: {
         const Byte *col_data = rg_base + rg.columns[column_idx].offset;
+        size_t bitmap_size = 0;
+        if (rg.columns[column_idx].has_nulls) {
+          bitmap_size = (rg.row_count + 7) / 8;
+          res->SetNullBitmapRaw(reinterpret_cast<const uint8_t *>(col_data),
+                                bitmap_size);
+          col_data += bitmap_size;
+        }
         static_cast<ColumnVector<int> *>(res.get())->AddSpan(
             reinterpret_cast<const int *>(col_data), rg.row_count,
             sst->data_file_);
@@ -735,6 +757,13 @@ void LSMTree::ScanColumnFromSSTables(size_t column_idx,
       }
       case ValueType::Type::Double: {
         const Byte *col_data = rg_base + rg.columns[column_idx].offset;
+        size_t bitmap_size = 0;
+        if (rg.columns[column_idx].has_nulls) {
+          bitmap_size = (rg.row_count + 7) / 8;
+          res->SetNullBitmapRaw(reinterpret_cast<const uint8_t *>(col_data),
+                                bitmap_size);
+          col_data += bitmap_size;
+        }
         static_cast<ColumnVector<double> *>(res.get())->AddSpan(
             reinterpret_cast<const double *>(col_data), rg.row_count,
             sst->data_file_);
@@ -814,6 +843,24 @@ void LSMTree::ReadColumnWithSV(size_t column_idx,
                                        col_ptr, col_len))
           return;
 
+        // col_len == 0 表示 null
+        if (col_len == 0) {
+          switch (type->GetType()) {
+          case ValueType::Type::Int:
+            static_cast<ColumnVector<int> *>(res.get())->Insert(0);
+            break;
+          case ValueType::Type::Double:
+            static_cast<ColumnVector<double> *>(res.get())->Insert(0.0);
+            break;
+          case ValueType::Type::String:
+            static_cast<ColumnString *>(res.get())->Insert(std::string(""));
+            break;
+          case ValueType::Type::Null: break;
+          }
+          res->SetNull(res->Size() - 1);
+          return;
+        }
+
         switch (type->GetType()) {
         case ValueType::Type::Int: {
           if (col_len == sizeof(int)) {
@@ -868,6 +915,24 @@ void LSMTree::ReadColumnWithSV(size_t column_idx,
         if (!RowCodec::DecodeColumnRaw(value_ptr, value_len, column_idx,
                                        col_ptr, col_len))
           return;
+
+        // col_len == 0 表示 null
+        if (col_len == 0) {
+          switch (type->GetType()) {
+          case ValueType::Type::Int:
+            static_cast<ColumnVector<int> *>(res.get())->Insert(0);
+            break;
+          case ValueType::Type::Double:
+            static_cast<ColumnVector<double> *>(res.get())->Insert(0.0);
+            break;
+          case ValueType::Type::String:
+            static_cast<ColumnString *>(res.get())->Insert(std::string(""));
+            break;
+          case ValueType::Type::Null: break;
+          }
+          res->SetNull(res->Size() - 1);
+          return;
+        }
 
         switch (type->GetType()) {
         case ValueType::Type::Int: {

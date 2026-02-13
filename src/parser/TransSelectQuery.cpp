@@ -125,12 +125,11 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
   // a TableFunction child was inserted
   for (size_t i = 2; i < select_query.children_.size(); i++) {
     if (select_query.children_[i]->GetNodeType() == ASTNodeType::Token) {
-      auto &where_token =
-          static_cast<ASTToken &>(*select_query.children_[i]);
+      auto &where_token = static_cast<ASTToken &>(*select_query.children_[i]);
       auto where_it = where_token.Begin();
       std::vector<BoundExpressRef> dummy_columns;
-      auto where_expr = ParseExpression(where_it, where_token.End(),
-                                        res->from_, dummy_columns, message);
+      auto where_expr = ParseExpression(where_it, where_token.End(), res->from_,
+                                        dummy_columns, message);
       if (!message.empty()) {
         return nullptr;
       }

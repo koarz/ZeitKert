@@ -20,6 +20,7 @@ struct ColumnChunkMeta {
   uint32_t offset = 0;
   uint32_t size = 0;
   ZoneMap zone;
+  bool has_nulls = false;
 };
 
 struct RowGroupMeta {
@@ -94,6 +95,8 @@ struct RowGroupMeta {
       }
       case ValueType::Type::Null: break;
       }
+      uint8_t col_has_nulls = col.has_nulls ? 1 : 0;
+      append(col_has_nulls);
     }
 
     uint32_t bloom_size = static_cast<uint32_t>(bloom.size());
@@ -202,6 +205,11 @@ struct RowGroupMeta {
       }
       case ValueType::Type::Null: break;
       }
+      uint8_t col_has_nulls = 0;
+      if (!read(col_has_nulls)) {
+        return false;
+      }
+      col.has_nulls = col_has_nulls != 0;
       out.columns.emplace_back(std::move(col));
     }
 

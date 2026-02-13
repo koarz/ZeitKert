@@ -14,7 +14,7 @@
 
 namespace DB {
 static constexpr uint32_t kSSTableMagic = 0x5A4B5254; // ZKRT
-static constexpr uint16_t kSSTableVersion = 1;
+static constexpr uint16_t kSSTableVersion = 2;
 
 static size_t AlignTo(size_t size, size_t alignment) {
   // 向上对齐到指定字节边界
@@ -150,31 +150,50 @@ struct ColumnBuilder {
   std::string data;
   std::vector<uint32_t> offsets;
   ZoneMapBuilder zone;
+  std::vector<uint8_t> null_bitmap;
+  bool has_nulls = false;
+  uint32_t row_count = 0;
 
   void Append(const Byte *value, uint32_t len) {
+    // Track null bitmap
+    size_t byte_idx = row_count / 8;
+    if (byte_idx >= null_bitmap.size()) {
+      null_bitmap.resize(byte_idx + 1, 0);
+    }
+
+    bool is_null = (!value || len == 0);
+
     if (type == ValueType::Type::String) {
-      if (!value || len == 0) {
+      if (is_null) {
         offsets.push_back(offsets.back());
+        null_bitmap[byte_idx] |= (1 << (row_count % 8));
+        has_nulls = true;
+        row_count++;
         return;
       }
       offsets.push_back(offsets.back() + len);
       data.append(reinterpret_cast<const char *>(value), len);
       zone.Update(value, len);
+      row_count++;
       return;
     }
 
     uint32_t fixed = FixedSize(type);
     if (fixed == 0) {
+      row_count++;
       return;
     }
-    if (!value || len == 0) {
+    if (is_null) {
       std::string zeros(fixed, 0);
       data.append(zeros.data(), zeros.size());
-      zone.Update(reinterpret_cast<const Byte *>(zeros.data()), fixed);
+      null_bitmap[byte_idx] |= (1 << (row_count % 8));
+      has_nulls = true;
+      row_count++;
       return;
     }
     data.append(reinterpret_cast<const char *>(value), fixed);
     zone.Update(value, fixed);
+    row_count++;
   }
 };
 
@@ -257,16 +276,27 @@ public:
       ColumnChunkMeta col_meta;
       col_meta.offset = static_cast<uint32_t>(offset);
       col_meta.zone = col.zone.Finish();
+      col_meta.has_nulls = col.has_nulls;
+
+      // 如果列有 null，先写入 null bitmap
+      if (col.has_nulls) {
+        size_t bitmap_size = (row_count_ + 7) / 8;
+        data.append(reinterpret_cast<const char *>(col.null_bitmap.data()),
+                    bitmap_size);
+      }
+
+      size_t bitmap_bytes = col.has_nulls ? (row_count_ + 7) / 8 : 0;
       if (col.type == ValueType::Type::String) {
         for (auto off : col.offsets) {
           data.append(reinterpret_cast<const char *>(&off), sizeof(off));
         }
         data.append(col.data);
         col_meta.size = static_cast<uint32_t>(
-            col.offsets.size() * sizeof(uint32_t) + col.data.size());
+            bitmap_bytes + col.offsets.size() * sizeof(uint32_t) +
+            col.data.size());
       } else {
         data.append(col.data);
-        col_meta.size = static_cast<uint32_t>(col.data.size());
+        col_meta.size = static_cast<uint32_t>(bitmap_bytes + col.data.size());
       }
       meta.columns.emplace_back(std::move(col_meta));
       offset += meta.columns.back().size;

@@ -37,7 +37,12 @@ public:
       case ValueType::Type::Int: {
         auto &col = static_cast<ColumnVector<int> &>(*c->GetColumn());
         for (size_t k = 0; k < row_count; k++) {
-          auto s = std::to_string(col[k]);
+          std::string s;
+          if (c->GetColumn()->IsNull(k)) {
+            s = "Null";
+          } else {
+            s = std::to_string(col[k]);
+          }
           if (s.size() > col_max) {
             col_max = s.size();
           }
@@ -48,7 +53,12 @@ public:
       case ValueType::Type::Double: {
         auto &col = static_cast<ColumnVector<double> &>(*c->GetColumn());
         for (size_t k = 0; k < row_count; k++) {
-          auto s = std::to_string(col[k]);
+          std::string s;
+          if (c->GetColumn()->IsNull(k)) {
+            s = "Null";
+          } else {
+            s = std::to_string(col[k]);
+          }
           if (s.size() > col_max) {
             col_max = s.size();
           }

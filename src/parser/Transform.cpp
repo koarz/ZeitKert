@@ -14,6 +14,7 @@
 #include "parser/binder/BoundTuple.hpp"
 #include "type/Double.hpp"
 #include "type/Int.hpp"
+#include "type/Null.hpp"
 #include "type/String.hpp"
 
 #include <algorithm>
@@ -429,8 +430,16 @@ BoundExpressRef Transform::ParsePrimary(TokenIterator &it, TokenIterator end,
   }
   case TokenType::Number: return MakeNumericConstant(*it, false);
   case TokenType::StringLiteral: return MakeStringConstant(*it);
-  case TokenType::BareWord:
+  case TokenType::BareWord: {
+    std::string word{it->begin, it->end};
+    std::transform(word.begin(), word.end(), word.begin(), ::toupper);
+    if (word == "NULL") {
+      auto null_const = std::make_shared<BoundConstant>();
+      null_const->type_ = std::make_shared<Null>();
+      return null_const;
+    }
     return ParseIdentifier(it, end, tables, columns, message);
+  }
   default: break;
   }
   message = fmt::format("unexpected token {}", getTokenName(it->type));

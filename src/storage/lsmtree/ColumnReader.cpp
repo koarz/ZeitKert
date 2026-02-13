@@ -17,6 +17,15 @@ void ColumnReader::ReadColumnFromRowGroup(
   const auto &col = rg.columns[col_idx];
   const Byte *col_data = base + col.offset;
 
+  // 如果列有 null，先读取 null bitmap
+  size_t bitmap_size = 0;
+  if (col.has_nulls) {
+    bitmap_size = (rg.row_count + 7) / 8;
+    column->SetNullBitmapRaw(reinterpret_cast<const uint8_t *>(col_data),
+                             bitmap_size);
+    col_data += bitmap_size;
+  }
+
   switch (type->GetType()) {
   case ValueType::Type::Int: {
     auto *vec = static_cast<ColumnVector<int> *>(column.get());
@@ -79,8 +88,38 @@ void ColumnReader::ReadColumnWithSelection(
   const auto &col = rg.columns[col_idx];
   const Byte *col_data = base + col.offset;
 
+  // 如果列有 null，读取 null bitmap 并跳过
+  size_t bitmap_size = 0;
+  const uint8_t *null_bitmap = nullptr;
+  if (col.has_nulls) {
+    bitmap_size = (rg.row_count + 7) / 8;
+    null_bitmap = reinterpret_cast<const uint8_t *>(col_data);
+    col_data += bitmap_size;
+  }
+
   // 获取需要读取的行索引列表
   auto read_row = [&](uint32_t row_idx) {
+    // 检查是否为 null
+    if (null_bitmap) {
+      if ((null_bitmap[row_idx / 8] >> (row_idx % 8)) & 1) {
+        // null 行：插入占位值并标记 null
+        switch (type->GetType()) {
+        case ValueType::Type::Int:
+          static_cast<ColumnVector<int> *>(column.get())->Insert(0);
+          break;
+        case ValueType::Type::Double:
+          static_cast<ColumnVector<double> *>(column.get())->Insert(0.0);
+          break;
+        case ValueType::Type::String:
+          static_cast<ColumnString *>(column.get())->Insert(std::string(""));
+          break;
+        case ValueType::Type::Null: break;
+        }
+        column->SetNull(column->Size() - 1);
+        return;
+      }
+    }
+
     switch (type->GetType()) {
     case ValueType::Type::Int: {
       int v = 0;

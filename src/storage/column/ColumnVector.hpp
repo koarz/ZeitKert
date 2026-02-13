@@ -39,6 +39,9 @@ public:
   const std::vector<DataSpan> &Spans() const { return spans_; }
 
   std::string GetStrElement(size_t idx) override {
+    if (IsNull(idx)) {
+      return "Null";
+    }
     size_t owned = data_.size();
     if (idx < owned) {
       return std::to_string(data_[idx]);

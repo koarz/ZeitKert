@@ -53,7 +53,7 @@ Status TableOperator::BuildSSTable(
 }
 
 static constexpr uint32_t kSSTableMagic = 0x5A4B5254; // ZKRT
-static constexpr uint16_t kSSTableVersion = 1;
+static constexpr uint16_t kSSTableVersion = 2;
 
 static Status ReadRange(std::filesystem::path path, uint32_t offset,
                         uint32_t size,

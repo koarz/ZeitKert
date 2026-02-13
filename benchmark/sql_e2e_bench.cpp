@@ -26,9 +26,8 @@ struct SqlBenchFixture {
     for (int i = 0; i < kBulkRows; i += 1000) {
       int end = std::min(i + 1000, kBulkRows);
       for (int j = i; j < end; ++j) {
-        std::string sql = "INSERT INTO bench_t VALUES (" +
-                          std::to_string(j) + ", " +
-                          std::to_string(j * 1.1) + ");";
+        std::string sql = "INSERT INTO bench_t VALUES (" + std::to_string(j) +
+                          ", " + std::to_string(j * 1.1) + ");";
         Exec(sql);
       }
     }
@@ -81,9 +80,8 @@ static void BM_SqlInsert(benchmark::State &state) {
   auto &fix = GetSqlFixture();
   int key = kBulkRows;
   for (auto _ : state) {
-    std::string sql = "INSERT INTO bench_t VALUES (" +
-                      std::to_string(key) + ", " +
-                      std::to_string(key * 2.2) + ");";
+    std::string sql = "INSERT INTO bench_t VALUES (" + std::to_string(key) +
+                      ", " + std::to_string(key * 2.2) + ");";
     ResultSet rs;
     auto s = fix.db->ExecuteQuery(sql, rs);
     benchmark::DoNotOptimize(s);

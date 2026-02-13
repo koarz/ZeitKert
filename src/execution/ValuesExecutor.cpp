@@ -26,7 +26,11 @@ Status ValuesExecutor::Execute() {
       col = std::make_shared<ColumnVector<double>>();
       static_cast<ColumnVector<double> &>(*col).Insert(value.value_.f64);
       break;
-    case ValueType::Type::Null: break;
+    case ValueType::Type::Null:
+      col = std::make_shared<ColumnVector<int>>();
+      static_cast<ColumnVector<int> &>(*col).Insert(0);
+      col->SetNull(0);
+      break;
     }
     auto col_name = value.ToString();
     auto column =

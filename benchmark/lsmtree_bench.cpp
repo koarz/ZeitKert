@@ -27,8 +27,8 @@ struct LSMBenchFixture {
 
   LSMBenchFixture(const std::string &name) {
     path = "bench_lsm_" + name + "_" +
-           std::to_string(std::hash<std::thread::id>{}(
-               std::this_thread::get_id()));
+           std::to_string(
+               std::hash<std::thread::id>{}(std::this_thread::get_id()));
     std::filesystem::remove_all(path);
     dm = std::make_shared<DiskManager>();
     bpm = std::make_shared<BufferPoolManager>(64, dm);
@@ -77,7 +77,8 @@ static void BM_BatchInsert(benchmark::State &state) {
     auto s = fix.lsm->BatchInsert(entries);
     benchmark::DoNotOptimize(s);
   }
-  state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(batch_size));
+  state.SetItemsProcessed(state.iterations() *
+                          static_cast<int64_t>(batch_size));
 }
 
 static void BM_FlushToSST(benchmark::State &state) {
