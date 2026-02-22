@@ -1,3 +1,9 @@
+/************************************
+ *                                  *
+ * This File Copied From Clickhouse *
+ *                                  *
+ ************************************/
+
 #include "parser/TokenIterator.hpp"
 
 namespace DB {

@@ -1,3 +1,9 @@
+/************************************
+ *                                  *
+ * This File Copied From Clickhouse *
+ *                                  *
+ ************************************/
+
 #pragma once
 
 #include "clickhouse/core/Defines.h"
