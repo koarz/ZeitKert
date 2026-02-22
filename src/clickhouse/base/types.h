@@ -1,3 +1,11 @@
+/***************************************
+ *                                     *
+ * This File Copied From ClickHouse    *
+ * Licensed under Apache License 2.0   *
+ * (Modified include paths by koarz)   *
+ *                                     *
+ ***************************************/
+
 #pragma once
 
 #include <cstdint>

@@ -1,3 +1,11 @@
+/***************************************
+ *                                     *
+ * This File Copied From ClickHouse    *
+ * Licensed under Apache License 2.0   *
+ * (Modified include paths by koarz)   *
+ *                                     *
+ ***************************************/
+
 #pragma once
 
 #include "clickhouse/base/types.h"
@@ -154,7 +162,8 @@ String toString(TargetArch arch);
  * pragmas.
  */
 #define DUMMY_FUNCTION_DEFINITION                                              \
-  [[maybe_unused]] void _dummy_function_definition();
+  [[maybe_unused]]                                                             \
+  void _dummy_function_definition();
 
 #define DECLARE_SSE42_SPECIFIC_CODE(...)                                       \
   BEGIN_SSE42_SPECIFIC_CODE                                                    \
