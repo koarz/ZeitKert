@@ -20,7 +20,7 @@ public:
 
   Status ParseDrop(TokenIterator &iterator);
 
-  Status ParseSelect(TokenIterator &iterator);
+  Status ParseSelect(TokenIterator &iterator, bool stop_at_paren = false);
 
   Status ParseInsert(TokenIterator &iterator);
 

@@ -8,6 +8,7 @@
 #include "parser/ASTInsertQuery.hpp"
 #include "parser/ASTSelectQuery.hpp"
 #include "parser/ASTShowQuery.hpp"
+#include "parser/ASTSubquery.hpp"
 #include "parser/ASTTableFunction.hpp"
 #include "parser/ASTTableNames.hpp"
 #include "parser/ASTToken.hpp"
@@ -154,19 +155,29 @@ SYNTAXERROR:
                        "Your SQL Query have syntax error");
 }
 
-Status Parser::ParseSelect(TokenIterator &iterator) {
+Status Parser::ParseSelect(TokenIterator &iterator, bool stop_at_paren) {
   tree_ = std::make_shared<SelectQuery>();
   std::optional<TokenIterator> begin{++iterator};
   bool have_from{};
+
+  // 扫描 SELECT 列表，直到遇到 FROM 关键字
+  // stop_at_paren=true 时，遇到未匹配的 ')' 也停止（子查询场景）
+  int col_depth = 0;
   while (!(++iterator)->isEnd()) {
-    std::string s{iterator->begin, iterator->end};
-    if (Checker::IsKeyWord(s)) {
-      if (s == "FROM") {
-        have_from = true;
+    if (iterator->type == TokenType::OpeningRoundBracket) {
+      ++col_depth;
+    } else if (iterator->type == TokenType::ClosingRoundBracket) {
+      if (col_depth == 0 && stop_at_paren)
         break;
-      }
+      --col_depth;
+    }
+    std::string s{iterator->begin, iterator->end};
+    if (col_depth == 0 && Checker::IsKeyWord(s) && s == "FROM") {
+      have_from = true;
+      break;
     }
   }
+
   std::optional<TokenIterator> end{iterator};
   tree_->children_.emplace_back(std::make_shared<ASTToken>(begin, end));
   if (have_from) {
@@ -179,14 +190,52 @@ Status Parser::ParseSelect(TokenIterator &iterator) {
       if (iterator->type == TokenType::Comma) {
         continue;
       }
+      // 子查询内部：遇到未匹配的 ')' 时停止（该 ')' 是子查询的关闭括号）
+      if (stop_at_paren && iterator->type == TokenType::ClosingRoundBracket) {
+        break;
+      }
       std::string s{iterator->begin, iterator->end};
       if (Checker::IsKeyWord(s) && s == "WHERE") {
         have_where = true;
         where_begin = ++iterator;
-        // 收集 WHERE 后面的所有 token
-        while (!(++iterator)->isEnd()) {}
+        // 收集 WHERE 后面的 token，在子查询内部要用深度计数避免把关闭括号误判为
+        // WHERE 结束
+        int where_depth = 0;
+        while (!(++iterator)->isEnd()) {
+          if (iterator->type == TokenType::OpeningRoundBracket) {
+            ++where_depth;
+          } else if (iterator->type == TokenType::ClosingRoundBracket) {
+            if (where_depth == 0 && stop_at_paren)
+              break;
+            --where_depth;
+          }
+        }
         where_end = iterator;
         break;
+      }
+      // 检测子查询：'(' 后紧跟 SELECT 关键字 → 递归解析
+      // 递归调用 ParseSelect(iterator, true)，遇到匹配的 ')' 时自动停止
+      // 支持任意层嵌套：select * from (select * from (select 1)) 等
+      if (iterator->type == TokenType::OpeningRoundBracket) {
+        auto peek = iterator;
+        ++peek;
+        if (!peek->isEnd() && peek->type == TokenType::BareWord) {
+          std::string kw{peek->begin, peek->end};
+          StringUtil::ToUpper(kw);
+          if (kw == "SELECT") {
+            iterator = peek; // 移动到 SELECT token
+            auto outer_tree = tree_;
+            ParseSelect(iterator, true); // 递归解析子查询，遇到 ')' 停止
+            auto inner_tree = tree_;
+            tree_ = outer_tree;
+            tree_->children_.emplace_back(
+                std::make_shared<ASTSubquery>(std::move(inner_tree)));
+            // 此时 iterator 停在 ')' 处，continue 后外层循环会 ++iterator
+            // 跳过它
+            continue;
+          }
+        }
+        continue;
       }
       // detect table function: identifier(args...)
       auto peek = iterator;

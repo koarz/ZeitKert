@@ -39,6 +39,11 @@ static void CollectColumns(const BoundExpressRef &expr,
 }
 
 Status Planner::PlanSelect(SelectStatement &satement) {
+  // 子查询透传：直接规划内层 statement，外层 select * 不做额外处理
+  if (satement.subquery_) {
+    return PlanSelect(*satement.subquery_);
+  }
+
   // Transfer range info from statement to planner
   if (satement.range_info_) {
     range_table_ = satement.range_table_;

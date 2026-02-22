@@ -46,6 +46,7 @@ enum class ASTNodeType {
   Token,
   FlushQuery,
   TableFunction,
+  Subquery,
 };
 
 enum class ShowType {

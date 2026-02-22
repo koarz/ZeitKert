@@ -1,5 +1,6 @@
 #include "parser/AST.hpp"
 #include "parser/ASTSelectQuery.hpp"
+#include "parser/ASTSubquery.hpp"
 #include "parser/ASTTableFunction.hpp"
 #include "parser/ASTTableNames.hpp"
 #include "parser/ASTToken.hpp"
@@ -16,6 +17,20 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
                             std::shared_ptr<QueryContext> context) {
   auto &select_query = static_cast<SelectQuery &>(*node);
   auto res = std::make_shared<SelectStatement>();
+
+  // 检查 FROM 子句中是否有子查询节点
+  // 如果有，递归 transform 内层查询，直接透传（passthrough）
+  // 支持任意嵌套深度：select * from (select * from (...))
+  for (auto &child : select_query.children_) {
+    if (child->GetNodeType() == ASTNodeType::Subquery) {
+      auto &subq = static_cast<ASTSubquery &>(*child);
+      res->subquery_ = TransSelectQuery(subq.inner_select_, message, context);
+      if (!res->subquery_) {
+        return nullptr;
+      }
+      return res;
+    }
+  }
 
   // Check for table function in children (e.g., range(1, 100))
   for (auto &child : select_query.children_) {
@@ -90,6 +105,10 @@ Transform::TransSelectQuery(ASTPtr node, std::string &message,
     if (child1->GetNodeType() == ASTNodeType::TableNames) {
       auto &tables = static_cast<TableNames &>(*child1);
       for (auto &s : tables.names_) {
+        if (context->database_ == nullptr) {
+          message = "no database selected, please use 'USE <database>' first";
+          return nullptr;
+        }
         auto table_meta = context->database_->GetTableMeta(s);
         if (table_meta == nullptr) {
           message = "the table not exist, please check table name";

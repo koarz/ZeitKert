@@ -31,5 +31,7 @@ struct SelectStatement : public SQLStatement {
 
   std::optional<RangeInfo> range_info_;
   TableMetaRef range_table_;
+
+  std::shared_ptr<SelectStatement> subquery_;
 };
 } // namespace DB
