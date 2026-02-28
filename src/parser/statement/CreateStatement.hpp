@@ -3,6 +3,8 @@
 #include "catalog/meta/ColumnMeta.hpp"
 #include "parser/SQLStatement.hpp"
 
+#include <vector>
+
 namespace DB {
 class CreateStatement : public SQLStatement {
 
