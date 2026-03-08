@@ -3,7 +3,7 @@
 - [ ] SSTable Compression
 - [ ] MVCC
 - [ ] SnapShot
-- [ ] Filter
+- [x] Filter
 - [ ] Recovery
 - [ ] Optimiser
 - [ ] Delete Query
@@ -12,7 +12,7 @@
 - [ ] Explain Query
 - [ ] Create Index
 - [ ] Optimizing Performance
-- [ ] Primary Key
-- [ ] Batch Insert
+- [x] Primary Key
+- [x] Batch Insert
 - [ ] Multi-table Join Query
-- [ ] Binary Operator(+ - * / % ...)
+- [x] Binary Operator(+ - * / % ...)
