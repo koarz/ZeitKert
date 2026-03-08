@@ -10,7 +10,7 @@
 namespace DB {
 class FunctionBinaryArithmetic final : public Function {
 public:
-  enum class Operator { Add, Sub, Mul, Div };
+  enum class Operator { Add, Sub, Mul, Div, Mod };
 
   FunctionBinaryArithmetic(Operator op, std::shared_ptr<ValueType> result_type);
 

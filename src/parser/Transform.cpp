@@ -246,7 +246,8 @@ int Transform::GetBinaryPrecedence(TokenType type) {
   case TokenType::Plus:
   case TokenType::Minus: return 3;
   case TokenType::Asterisk:
-  case TokenType::Slash: return 4;
+  case TokenType::Slash:
+  case TokenType::Percent: return 4;
   default: return -1;
   }
 }
@@ -376,6 +377,10 @@ BoundExpressRef Transform::CreateArithmeticFunction(TokenType op_type,
   case TokenType::Slash:
     return std::make_shared<BoundFunction>(
         std::make_shared<FunctionBinaryArithmetic>(Operator::Div, result_type),
+        make_args());
+  case TokenType::Percent:
+    return std::make_shared<BoundFunction>(
+        std::make_shared<FunctionBinaryArithmetic>(Operator::Mod, result_type),
         make_args());
   default:
     message = fmt::format("operator {} not supported", getTokenName(op_type));

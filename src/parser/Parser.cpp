@@ -163,6 +163,9 @@ Status Parser::ParseSelect(TokenIterator &iterator, bool stop_at_paren) {
   // 扫描 SELECT 列表，直到遇到 FROM 关键字
   // stop_at_paren=true 时，遇到未匹配的 ')' 也停止（子查询场景）
   int col_depth = 0;
+  if (iterator->type == TokenType::OpeningRoundBracket) {
+    ++col_depth;
+  }
   while (!(++iterator)->isEnd()) {
     if (iterator->type == TokenType::OpeningRoundBracket) {
       ++col_depth;

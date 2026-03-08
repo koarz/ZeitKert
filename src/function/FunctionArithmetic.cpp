@@ -46,6 +46,7 @@ static double ApplyOperator(FunctionBinaryArithmetic::Operator op, double lhs,
   case FunctionBinaryArithmetic::Operator::Sub: return lhs - rhs;
   case FunctionBinaryArithmetic::Operator::Mul: return lhs * rhs;
   case FunctionBinaryArithmetic::Operator::Div: return lhs / rhs;
+  case FunctionBinaryArithmetic::Operator::Mod: return std::fmod(lhs, rhs);
   }
   return 0.0;
 }
@@ -56,6 +57,7 @@ static std::string OperatorName(FunctionBinaryArithmetic::Operator op) {
   case FunctionBinaryArithmetic::Operator::Sub: return "SUB";
   case FunctionBinaryArithmetic::Operator::Mul: return "MUL";
   case FunctionBinaryArithmetic::Operator::Div: return "DIV";
+  case FunctionBinaryArithmetic::Operator::Mod: return "MOD";
   }
   return "ARITH";
 }
@@ -88,7 +90,7 @@ Status FunctionBinaryArithmetic::ExecuteImpl(Block &block, size_t result_idx,
           ErrorCode::BindError,
           fmt::format("{} just support INT/DOUBLE arguments", name_));
     }
-    if (op_ == Operator::Div && rhs_value == 0.0) {
+    if ((op_ == Operator::Div || op_ == Operator::Mod) && rhs_value == 0.0) {
       return Status::Error(ErrorCode::BindError, "Division by zero");
     }
     double result = ApplyOperator(op_, lhs_value, rhs_value);
