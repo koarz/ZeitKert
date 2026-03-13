@@ -1669,4 +1669,241 @@ size_t LSMTree::GetL0FileCount() const {
   return levels_[0].sstables.size();
 }
 
+// 两个有序列表取交集
+static std::vector<uint32_t> IntersectSorted(const std::vector<uint32_t> &a,
+                                             const std::vector<uint32_t> &b) {
+  std::vector<uint32_t> result;
+  size_t i = 0, j = 0;
+  while (i < a.size() && j < b.size()) {
+    if (a[i] < b[j]) {
+      i++;
+    } else if (a[i] > b[j]) {
+      j++;
+    } else {
+      result.push_back(a[i]);
+      i++;
+      j++;
+    }
+  }
+  return result;
+}
+
+void LSMTree::ScanColumnsFromSSTablesWithPredicates(
+    const std::vector<size_t> &column_indices,
+    const std::vector<ScanPredicate> &predicates,
+    std::vector<ColumnPtr> &results) {
+
+  for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it) {
+    auto &[id, sst] = *it;
+    if (!sst->data_file_ || !sst->data_file_->Valid())
+      continue;
+
+    const Byte *file_base = sst->data_file_->Data();
+
+    for (size_t rg_idx = 0; rg_idx < sst->rowgroups_.size(); rg_idx++) {
+      const auto &rg = sst->rowgroups_[rg_idx];
+      if (rg.row_count == 0)
+        continue;
+      const Byte *rg_base = file_base + static_cast<size_t>(rg.offset);
+
+      // 1. ZoneMap 裁剪
+      bool skip = false;
+      for (const auto &pred : predicates) {
+        if (pred.column_idx < rg.columns.size() &&
+            !ZoneMapMayMatch(rg.columns[pred.column_idx].zone, pred)) {
+          skip = true;
+          break;
+        }
+      }
+      if (skip)
+        continue;
+
+      // 2. 行级过滤：在各谓词列上求值，取交集
+      std::vector<uint32_t> matching;
+      ColumnReader::EvalPredicateOnRowGroup(rg, rg_base, predicates[0],
+                                            matching);
+      for (size_t p = 1; p < predicates.size() && !matching.empty(); p++) {
+        std::vector<uint32_t> next;
+        ColumnReader::EvalPredicateOnRowGroup(rg, rg_base, predicates[p], next);
+        matching = IntersectSorted(matching, next);
+      }
+
+      if (matching.empty())
+        continue;
+
+      // 3. 读取请求的列
+      if (matching.size() == rg.row_count) {
+        // 全部命中 → 走零拷贝路径
+        for (size_t ci = 0; ci < column_indices.size(); ci++) {
+          size_t col_idx = column_indices[ci];
+          if (col_idx >= rg.columns.size())
+            continue;
+          auto col_type = column_types_[col_idx]->GetType();
+          const Byte *col_data = rg_base + rg.columns[col_idx].offset;
+
+          switch (col_type) {
+          case ValueType::Type::Int: {
+            size_t bitmap_size = 0;
+            if (rg.columns[col_idx].has_nulls) {
+              bitmap_size = (rg.row_count + 7) / 8;
+              results[ci]->SetNullBitmapRaw(
+                  reinterpret_cast<const uint8_t *>(col_data), bitmap_size);
+              col_data += bitmap_size;
+            }
+            static_cast<ColumnVector<int> *>(results[ci].get())
+                ->AddSpan(reinterpret_cast<const int *>(col_data), rg.row_count,
+                          sst->data_file_);
+            break;
+          }
+          case ValueType::Type::Double: {
+            size_t bitmap_size = 0;
+            if (rg.columns[col_idx].has_nulls) {
+              bitmap_size = (rg.row_count + 7) / 8;
+              results[ci]->SetNullBitmapRaw(
+                  reinterpret_cast<const uint8_t *>(col_data), bitmap_size);
+              col_data += bitmap_size;
+            }
+            static_cast<ColumnVector<double> *>(results[ci].get())
+                ->AddSpan(reinterpret_cast<const double *>(col_data),
+                          rg.row_count, sst->data_file_);
+            break;
+          }
+          case ValueType::Type::String:
+            ColumnReader::ReadColumnFromRowGroup(
+                rg, rg_base, col_idx, column_types_[col_idx], results[ci]);
+            break;
+          default: break;
+          }
+        }
+      } else {
+        // 部分命中 → 用离散行索引读取
+        RowGroupSelection sel;
+        sel.source = DataSource::SSTable;
+        sel.source_id = id;
+        sel.rowgroup_idx = static_cast<uint32_t>(rg_idx);
+        sel.rows = std::move(matching);
+
+        for (size_t ci = 0; ci < column_indices.size(); ci++) {
+          size_t col_idx = column_indices[ci];
+          if (col_idx >= rg.columns.size())
+            continue;
+          ColumnReader::ReadColumnWithSelection(
+              rg, rg_base, col_idx, column_types_[col_idx], sel, results[ci]);
+        }
+      }
+    }
+  }
+}
+
+Status LSMTree::ScanColumnsWithPredicates(
+    const std::vector<size_t> &column_indices, std::vector<ColumnPtr> &results,
+    const std::vector<ScanPredicate> &predicates, bool &all_filtered) {
+
+  results.resize(column_indices.size());
+
+  for (size_t i = 0; i < column_indices.size(); i++) {
+    if (column_indices[i] >= column_types_.size()) {
+      return Status::Error(ErrorCode::NotFound, "Column index out of range");
+    }
+  }
+
+  std::shared_lock lock1(latch_), lock2(immutable_latch_);
+
+  for (size_t i = 0; i < column_indices.size(); i++) {
+    results[i] = MakeEmptyColumn(column_types_[column_indices[i]]->GetType());
+  }
+
+  if (!HasInMemoryData()) {
+    // 快速路径：直接从 SSTable 扫描 + 谓词过滤，所有数据都已过滤
+    ScanColumnsFromSSTablesWithPredicates(column_indices, predicates, results);
+    all_filtered = true;
+    return Status::OK();
+  }
+
+  // 常规路径：MemTable 数据未经谓词过滤
+  all_filtered = false;
+  auto sv = BuildSelectionVector();
+  SelectionVector filtered_sv;
+
+  for (const auto &sel : sv.GetSelections()) {
+    if (sel.source != DataSource::SSTable) {
+      // MemTable/Immutable：原样保留（不在扫描层过滤）
+      if (sel.IsContiguous()) {
+        filtered_sv.AddContiguous(sel.source, sel.source_id, sel.rowgroup_idx,
+                                  sel.start_row, sel.count);
+      } else {
+        filtered_sv.AddRows(sel.source, sel.source_id, sel.rowgroup_idx,
+                            std::vector<uint32_t>(sel.rows));
+      }
+      continue;
+    }
+
+    // SSTable 条目：应用 ZoneMap + 行级过滤
+    auto sst_it = sstables_.find(sel.source_id);
+    if (sst_it == sstables_.end())
+      continue;
+    auto &sst = sst_it->second;
+    if (!sst->data_file_ || !sst->data_file_->Valid())
+      continue;
+    if (sel.rowgroup_idx >= sst->rowgroups_.size())
+      continue;
+
+    const auto &rg = sst->rowgroups_[sel.rowgroup_idx];
+    const Byte *rg_base =
+        sst->data_file_->Data() + static_cast<size_t>(rg.offset);
+
+    // ZoneMap 检查
+    bool skip = false;
+    for (const auto &pred : predicates) {
+      if (pred.column_idx < rg.columns.size() &&
+          !ZoneMapMayMatch(rg.columns[pred.column_idx].zone, pred)) {
+        skip = true;
+        break;
+      }
+    }
+    if (skip)
+      continue;
+
+    // 行级过滤：在谓词列上求值
+    std::vector<uint32_t> pred_matching;
+    ColumnReader::EvalPredicateOnRowGroup(rg, rg_base, predicates[0],
+                                          pred_matching);
+    for (size_t p = 1; p < predicates.size() && !pred_matching.empty(); p++) {
+      std::vector<uint32_t> next;
+      ColumnReader::EvalPredicateOnRowGroup(rg, rg_base, predicates[p], next);
+      pred_matching = IntersectSorted(pred_matching, next);
+    }
+
+    if (pred_matching.empty())
+      continue;
+
+    // 将 sel 中的候选行与谓词匹配行取交集
+    std::vector<uint32_t> sel_rows;
+    if (sel.IsContiguous()) {
+      sel_rows.reserve(sel.count);
+      for (uint32_t r = 0; r < sel.count; r++) {
+        sel_rows.push_back(sel.start_row + r);
+      }
+    } else {
+      sel_rows = sel.rows;
+    }
+
+    auto filtered_rows = IntersectSorted(sel_rows, pred_matching);
+    if (!filtered_rows.empty()) {
+      filtered_sv.AddRows(sel.source, sel.source_id, sel.rowgroup_idx,
+                          std::move(filtered_rows));
+    }
+  }
+
+  // 用过滤后的 SV 读取列
+  for (size_t i = 0; i < column_indices.size(); i++) {
+    auto type = column_types_[column_indices[i]];
+    if (type->GetType() != ValueType::Type::Null) {
+      ReadColumnWithSV(column_indices[i], type, filtered_sv, results[i]);
+    }
+  }
+
+  return Status::OK();
+}
+
 } // namespace DB

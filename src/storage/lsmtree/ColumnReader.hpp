@@ -3,11 +3,14 @@
 #include "storage/column/Column.hpp"
 #include "storage/lsmtree/RowGroupMeta.hpp"
 #include "storage/lsmtree/SSTable.hpp"
+#include "storage/lsmtree/ScanPredicate.hpp"
 #include "storage/lsmtree/SelectionVector.hpp"
 #include "type/ValueType.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace DB {
 
@@ -31,6 +34,12 @@ public:
                                       const std::shared_ptr<ValueType> &type,
                                       const RowGroupSelection &sel,
                                       ColumnPtr &column);
+
+  // 在 RowGroup 上对单个谓词求值，返回匹配的行索引（有序）
+  static void EvalPredicateOnRowGroup(const RowGroupMeta &rg,
+                                      const Byte *rg_base,
+                                      const ScanPredicate &pred,
+                                      std::vector<uint32_t> &matching_rows);
 };
 
 } // namespace DB

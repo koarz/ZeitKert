@@ -1,6 +1,8 @@
 #include "execution/FilterExecutor.hpp"
 #include "common/Status.hpp"
 #include "execution/FunctionExecutor.hpp"
+#include "function/FunctionComparison.hpp"
+#include "function/FunctionLogical.hpp"
 #include "parser/binder/BoundColumnMeta.hpp"
 #include "parser/binder/BoundConstant.hpp"
 #include "parser/binder/BoundFunction.hpp"
@@ -10,6 +12,7 @@
 #include "storage/column/ColumnVector.hpp"
 #include "storage/column/ColumnWithNameType.hpp"
 #include "storage/lsmtree/LSMTree.hpp"
+#include "storage/lsmtree/ScanPredicate.hpp"
 #include "type/ValueType.hpp"
 
 #include <cstddef>
@@ -59,6 +62,118 @@ static ColumnPtr FilterColumnData(const ColumnPtr &col,
   }
   default: return col;
   }
+}
+
+// 翻转比较算子（当常量在左边时）
+static FunctionComparison::Operator
+FlipOperator(FunctionComparison::Operator op) {
+  using Op = FunctionComparison::Operator;
+  switch (op) {
+  case Op::Less: return Op::Greater;
+  case Op::LessOrEquals: return Op::GreaterOrEquals;
+  case Op::Greater: return Op::Less;
+  case Op::GreaterOrEquals: return Op::LessOrEquals;
+  case Op::Equals: return Op::Equals;
+  case Op::NotEquals: return Op::NotEquals;
+  }
+  return op;
+}
+
+// 从 BoundExpression 树中提取可下推的简单谓词
+// 只处理 AND 连接的 column <op> constant 形式
+static void ExtractPredicates(const BoundExpressRef &expr,
+                              const std::vector<FilterColumnScan> &columns,
+                              std::vector<ScanPredicate> &pushed,
+                              bool &all_pushed) {
+  if (expr->expr_type_ != BoundExpressType::BoundFunction) {
+    all_pushed = false;
+    return;
+  }
+
+  auto &func_expr = static_cast<BoundFunction &>(*expr);
+  auto func = func_expr.GetFunction();
+  auto args = func_expr.GetArguments();
+
+  // AND: 递归提取两个子表达式
+  auto *logical = dynamic_cast<FunctionLogical *>(func.get());
+  if (logical) {
+    if (logical->GetOperator() == FunctionLogical::Operator::And) {
+      if (args.size() == 2) {
+        ExtractPredicates(args[0], columns, pushed, all_pushed);
+        ExtractPredicates(args[1], columns, pushed, all_pushed);
+      }
+      return;
+    }
+    // OR 或其他逻辑算子：不下推
+    all_pushed = false;
+    return;
+  }
+
+  // 比较算子: column <op> constant
+  auto *cmp = dynamic_cast<FunctionComparison *>(func.get());
+  if (!cmp || args.size() != 2) {
+    all_pushed = false;
+    return;
+  }
+
+  // 识别 column 和 constant 参数
+  BoundColumnMeta *col_arg = nullptr;
+  BoundConstant *const_arg = nullptr;
+  bool const_on_left = false;
+
+  if (args[0]->expr_type_ == BoundExpressType::BoundColumnMeta &&
+      args[1]->expr_type_ == BoundExpressType::BoundConstant) {
+    col_arg = static_cast<BoundColumnMeta *>(args[0].get());
+    const_arg = static_cast<BoundConstant *>(args[1].get());
+  } else if (args[0]->expr_type_ == BoundExpressType::BoundConstant &&
+             args[1]->expr_type_ == BoundExpressType::BoundColumnMeta) {
+    col_arg = static_cast<BoundColumnMeta *>(args[1].get());
+    const_arg = static_cast<BoundConstant *>(args[0].get());
+    const_on_left = true;
+  } else {
+    all_pushed = false;
+    return;
+  }
+
+  // 在 condition_columns_ 中查找该列的 column_idx
+  auto col_name = col_arg->GetColumnMeta()->name_;
+  size_t found_col_idx = SIZE_MAX;
+  ValueType::Type col_type = ValueType::Type::Null;
+  for (const auto &cs : columns) {
+    if (cs.column_meta->name_ == col_name) {
+      found_col_idx = cs.column_idx;
+      col_type = cs.column_meta->type_->GetType();
+      break;
+    }
+  }
+
+  if (found_col_idx == SIZE_MAX) {
+    all_pushed = false;
+    return;
+  }
+
+  auto op = cmp->GetOperator();
+  if (const_on_left) {
+    op = FlipOperator(op);
+  }
+
+  ScanPredicate pred;
+  pred.column_idx = found_col_idx;
+  pred.column_type = col_type;
+  pred.op = op;
+
+  switch (const_arg->type_->GetType()) {
+  case ValueType::Type::Int: pred.const_int = const_arg->value_.i32; break;
+  case ValueType::Type::Double:
+    pred.const_double = const_arg->value_.f64;
+    break;
+  case ValueType::Type::String:
+    pred.const_string = std::string(const_arg->value_.str, const_arg->size_);
+    break;
+  default: all_pushed = false; return;
+  }
+
+  pushed.push_back(std::move(pred));
 }
 
 Status FilterExecutor::ScanConditionColumns() {
@@ -113,37 +228,107 @@ Status FilterExecutor::Execute() {
     return Status::OK();
   }
 
-  // 1. 扫描所有表列
-  auto status = ScanConditionColumns();
-  if (!status.ok()) {
-    return status;
-  }
+  // 1. 提取可下推谓词
+  std::vector<ScanPredicate> pushed_predicates;
+  bool all_pushed = true;
+  ExtractPredicates(condition_, condition_columns_, pushed_predicates,
+                    all_pushed);
 
-  // 2. 递归求值 WHERE 条件得到 mask
-  auto eval_column = EvalCondition(condition_);
-  if (!eval_column) {
-    return Status::Error(ErrorCode::BindError,
-                         "failed to evaluate WHERE condition");
-  }
+  // 2. 带谓词下推的扫描路径
+  if (!pushed_predicates.empty()) {
+    // 按 LSMTree 指针分组
+    std::unordered_map<LSMTree *, std::vector<std::pair<size_t, size_t>>>
+        lsm_groups;
+    for (size_t i = 0; i < condition_columns_.size(); i++) {
+      auto &cs = condition_columns_[i];
+      lsm_groups[cs.lsm_tree.get()].emplace_back(cs.column_idx, i);
+    }
 
-  // mask 应该是 ColumnVector<int>
-  auto &mask = static_cast<ColumnVector<int> &>(*eval_column);
+    for (auto &[lsm_ptr, col_pairs] : lsm_groups) {
+      std::vector<size_t> column_indices;
+      column_indices.reserve(col_pairs.size());
+      for (auto &[col_idx, orig_idx] : col_pairs) {
+        column_indices.push_back(col_idx);
+      }
 
-  // 3. 对所有扫描的列应用 mask，并放入全局缓存
-  for (auto &col_scan : condition_columns_) {
-    auto &col_meta = col_scan.column_meta;
-    auto col_name = col_meta->name_;
-    auto it = condition_column_data_.find(col_name);
-    if (it != condition_column_data_.end()) {
-      auto filtered = FilterColumnData(it->second, col_meta->type_, mask);
-      FilteredDataCache::Set(col_name, filtered);
+      auto &lsm = condition_columns_[col_pairs[0].second].lsm_tree;
+
+      std::vector<ColumnPtr> results;
+      bool all_filtered = false;
+      auto s = lsm->ScanColumnsWithPredicates(column_indices, results,
+                                              pushed_predicates, all_filtered);
+      if (!s.ok()) {
+        return s;
+      }
+
+      // 只有当谓词表达式全部下推且数据全部经过扫描层过滤时才跳过 EvalCondition
+      if (!all_filtered) {
+        all_pushed = false;
+      }
+
+      for (size_t i = 0; i < col_pairs.size(); i++) {
+        auto &col_meta = condition_columns_[col_pairs[i].second].column_meta;
+        condition_column_data_[col_meta->name_] = results[i];
+      }
+    }
+
+    if (all_pushed) {
+      // 所有谓词都已下推，数据已过滤，直接放入缓存
+      for (auto &col_scan : condition_columns_) {
+        auto &col_meta = col_scan.column_meta;
+        auto it = condition_column_data_.find(col_meta->name_);
+        if (it != condition_column_data_.end()) {
+          FilteredDataCache::Set(col_meta->name_, it->second);
+        }
+      }
+    } else {
+      // 有残留谓词（OR 等），仍需 EvalCondition + mask 过滤
+      auto eval_column = EvalCondition(condition_);
+      if (!eval_column) {
+        return Status::Error(ErrorCode::BindError,
+                             "failed to evaluate WHERE condition");
+      }
+      auto &mask = static_cast<ColumnVector<int> &>(*eval_column);
+
+      for (auto &col_scan : condition_columns_) {
+        auto &col_meta = col_scan.column_meta;
+        auto it = condition_column_data_.find(col_meta->name_);
+        if (it != condition_column_data_.end()) {
+          auto filtered = FilterColumnData(it->second, col_meta->type_, mask);
+          FilteredDataCache::Set(col_meta->name_, filtered);
+        }
+      }
+    }
+  } else {
+    // 无可下推谓词，走现有路径
+    auto status = ScanConditionColumns();
+    if (!status.ok()) {
+      return status;
+    }
+
+    auto eval_column = EvalCondition(condition_);
+    if (!eval_column) {
+      return Status::Error(ErrorCode::BindError,
+                           "failed to evaluate WHERE condition");
+    }
+    auto &mask = static_cast<ColumnVector<int> &>(*eval_column);
+
+    for (auto &col_scan : condition_columns_) {
+      auto &col_meta = col_scan.column_meta;
+      auto col_name = col_meta->name_;
+      auto it = condition_column_data_.find(col_name);
+      if (it != condition_column_data_.end()) {
+        auto filtered = FilterColumnData(it->second, col_meta->type_, mask);
+        FilteredDataCache::Set(col_name, filtered);
+      }
     }
   }
 
-  // 4. 激活缓存，让 ScanColumnExecutor 使用过滤后的数据
+  // 激活缓存
   FilteredDataCache::Activate();
 
-  // 5. 执行子节点 (Projection)，子节点中的 ScanColumn 会从缓存读取过滤后的数据
+  // 执行子节点 (Projection)
+  Status status;
   for (auto &child : children_) {
     status = child->Execute();
     if (!status.ok()) {
@@ -155,7 +340,7 @@ Status FilterExecutor::Execute() {
     }
   }
 
-  // 6. 清理缓存
+  // 清理缓存
   FilteredDataCache::Clear();
 
   return Status::OK();

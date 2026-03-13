@@ -7,6 +7,7 @@
 #include "storage/lsmtree/LevelMeta.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/SSTable.hpp"
+#include "storage/lsmtree/ScanPredicate.hpp"
 #include "storage/lsmtree/SelectionVector.hpp"
 #include "storage/lsmtree/Slice.hpp"
 #include "storage/lsmtree/TableOperator.hpp"
@@ -66,6 +67,12 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
                               const std::shared_ptr<ValueType> &type,
                               ColumnPtr &res);
 
+  // 快速路径（带谓词）：从 SSTable 读取列，应用 ZoneMap 裁剪和行级过滤
+  void ScanColumnsFromSSTablesWithPredicates(
+      const std::vector<size_t> &column_indices,
+      const std::vector<ScanPredicate> &predicates,
+      std::vector<ColumnPtr> &results);
+
   // 刷盘后将新 SSTable 加入 L0
   void AddToL0(uint32_t sstable_id, const SSTableRef &sstable);
 
@@ -91,6 +98,13 @@ public:
   // 多列并行扫描：BuildSelectionVector 只构建一次，多列读取并行执行
   Status ScanColumns(const std::vector<size_t> &column_indices,
                      std::vector<ColumnPtr> &results);
+
+  // 带谓词下推的多列扫描（AND 语义：所有谓词都必须满足）
+  // all_filtered: 输出参数，true 表示返回的数据已完全被谓词过滤
+  Status ScanColumnsWithPredicates(const std::vector<size_t> &column_indices,
+                                   std::vector<ColumnPtr> &results,
+                                   const std::vector<ScanPredicate> &predicates,
+                                   bool &all_filtered);
 
   // 构建去重后的 SelectionVector
   SelectionVector BuildSelectionVector();

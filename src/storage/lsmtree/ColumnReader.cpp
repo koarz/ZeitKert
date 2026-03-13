@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string_view>
 
 namespace DB {
 
@@ -155,6 +156,88 @@ void ColumnReader::ReadColumnWithSelection(
     for (uint32_t idx : sel.rows) {
       read_row(idx);
     }
+  }
+}
+
+void ColumnReader::EvalPredicateOnRowGroup(
+    const RowGroupMeta &rg, const Byte *rg_base, const ScanPredicate &pred,
+    std::vector<uint32_t> &matching_rows) {
+  if (rg.row_count == 0 || pred.column_idx >= rg.columns.size()) {
+    return;
+  }
+
+  const auto &col_meta = rg.columns[pred.column_idx];
+  const Byte *col_data = rg_base + col_meta.offset;
+
+  // 跳过 null bitmap
+  size_t bitmap_size = 0;
+  const uint8_t *null_bitmap = nullptr;
+  if (col_meta.has_nulls) {
+    bitmap_size = (rg.row_count + 7) / 8;
+    null_bitmap = reinterpret_cast<const uint8_t *>(col_data);
+    col_data += bitmap_size;
+  }
+
+  using Op = FunctionComparison::Operator;
+
+  auto compare = [](Op op, auto lhs, auto rhs) -> bool {
+    switch (op) {
+    case Op::Less: return lhs < rhs;
+    case Op::LessOrEquals: return lhs <= rhs;
+    case Op::Greater: return lhs > rhs;
+    case Op::GreaterOrEquals: return lhs >= rhs;
+    case Op::Equals: return lhs == rhs;
+    case Op::NotEquals: return lhs != rhs;
+    }
+    return false;
+  };
+
+  switch (pred.column_type) {
+  case ValueType::Type::Int: {
+    const int *data = reinterpret_cast<const int *>(col_data);
+    int c = pred.const_int;
+    for (uint32_t i = 0; i < rg.row_count; i++) {
+      if (null_bitmap && ((null_bitmap[i / 8] >> (i % 8)) & 1)) {
+        continue; // null 行不匹配
+      }
+      if (compare(pred.op, data[i], c)) {
+        matching_rows.push_back(i);
+      }
+    }
+    break;
+  }
+  case ValueType::Type::Double: {
+    const double *data = reinterpret_cast<const double *>(col_data);
+    double c = pred.const_double;
+    for (uint32_t i = 0; i < rg.row_count; i++) {
+      if (null_bitmap && ((null_bitmap[i / 8] >> (i % 8)) & 1)) {
+        continue;
+      }
+      if (compare(pred.op, data[i], c)) {
+        matching_rows.push_back(i);
+      }
+    }
+    break;
+  }
+  case ValueType::Type::String: {
+    const uint32_t *offsets = reinterpret_cast<const uint32_t *>(col_data);
+    const char *str_data =
+        reinterpret_cast<const char *>(offsets + rg.row_count + 1);
+    const auto &c = pred.const_string;
+    for (uint32_t i = 0; i < rg.row_count; i++) {
+      if (null_bitmap && ((null_bitmap[i / 8] >> (i % 8)) & 1)) {
+        continue;
+      }
+      uint32_t start = offsets[i];
+      uint32_t end = offsets[i + 1];
+      std::string_view sv(str_data + start, end - start);
+      if (compare(pred.op, sv, std::string_view(c))) {
+        matching_rows.push_back(i);
+      }
+    }
+    break;
+  }
+  default: break;
   }
 }
 

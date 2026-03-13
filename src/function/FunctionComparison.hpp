@@ -36,6 +36,8 @@ public:
     return Status::OK();
   }
 
+  Operator GetOperator() const { return op_; }
+
 private:
   std::string name_;
   Operator op_;
