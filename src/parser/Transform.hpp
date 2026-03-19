@@ -5,6 +5,7 @@
 #include "parser/TokenIterator.hpp"
 #include "parser/binder/BoundExpress.hpp"
 #include "parser/statement/CreateStatement.hpp"
+#include "parser/statement/DeleteStatement.hpp"
 #include "parser/statement/DropStatement.hpp"
 #include "parser/statement/FlushStatement.hpp"
 #include "parser/statement/InsertStatement.hpp"
@@ -42,6 +43,10 @@ struct Transform {
   static std::shared_ptr<FlushStatement>
   TransFlushQuery(ASTPtr node, std::string &message,
                   std::shared_ptr<QueryContext> context);
+
+  static std::shared_ptr<DeleteStatement>
+  TransDeleteQuery(ASTPtr node, std::string &message,
+                   std::shared_ptr<QueryContext> context);
 
 private:
   static constexpr const char *kAmbiguousColumnFmt =

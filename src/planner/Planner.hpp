@@ -3,6 +3,7 @@
 #include "catalog/meta/TableMeta.hpp"
 #include "common/Context.hpp"
 #include "common/Status.hpp"
+#include "parser/statement/DeleteStatement.hpp"
 #include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
@@ -30,6 +31,8 @@ public:
   Status PlanSelect(SelectStatement &statement);
 
   Status PlanInsert(InsertStatement &statement);
+
+  Status PlanDelete(DeleteStatement &statement);
 
   AbstractPlanNodeRef GetPlanNode(BoundExpressRef plan);
 };

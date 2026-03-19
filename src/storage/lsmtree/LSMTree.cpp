@@ -1112,6 +1112,7 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
     DataSource source;
     uint32_t source_id;
     uint32_t row_idx;
+    bool is_tombstone;
   };
 
   // 预估容量
@@ -1128,10 +1129,8 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
     const auto &entries = memtable_->GetImpl().GetIntEntries();
     for (size_t i = 0; i < entries.size(); ++i) {
       const auto &e = entries[i];
-      if (e.value_len == 0)
-        continue; // 跳过删除
-      key_locations.push_back(
-          {e.key, DataSource::MemTable, 0, static_cast<uint32_t>(i)});
+      key_locations.push_back({e.key, DataSource::MemTable, 0,
+                               static_cast<uint32_t>(i), e.value_len == 0});
     }
   }
 
@@ -1141,11 +1140,9 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
         immutable_table_[imm_idx - 1]->GetImpl().GetIntEntries();
     for (size_t i = 0; i < entries.size(); ++i) {
       const auto &e = entries[i];
-      if (e.value_len == 0)
-        continue;
       key_locations.push_back({e.key, DataSource::Immutable,
                                static_cast<uint32_t>(imm_idx - 1),
-                               static_cast<uint32_t>(i)});
+                               static_cast<uint32_t>(i), e.value_len == 0});
     }
   }
 
@@ -1157,7 +1154,7 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
                      return a.row_idx > b.row_idx;
                    });
 
-  // 去重并分组（取第一个即最新版本）
+  // 去重并分组（取第一个即最新版本，跳过 tombstone）
   std::vector<int> mem_keys;
   mem_keys.reserve(key_locations.size());
 
@@ -1168,11 +1165,14 @@ SelectionVector LSMTree::BuildSelectionVectorInt() {
   bool first = true;
   for (const auto &loc : key_locations) {
     if (first || loc.key != last_key) {
+      // 最新版本是 tombstone → 该 key 已删除，记入 mem_keys 但不加入任何 rows
       mem_keys.push_back(loc.key);
-      if (loc.source == DataSource::MemTable) {
-        memtable_rows.push_back(loc.row_idx);
-      } else {
-        immutable_rows[loc.source_id].push_back(loc.row_idx);
+      if (!loc.is_tombstone) {
+        if (loc.source == DataSource::MemTable) {
+          memtable_rows.push_back(loc.row_idx);
+        } else {
+          immutable_rows[loc.source_id].push_back(loc.row_idx);
+        }
       }
       last_key = loc.key;
       first = false;
@@ -1318,6 +1318,7 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
     DataSource source;
     uint32_t source_id;
     uint32_t row_idx;
+    bool is_tombstone;
   };
 
   size_t estimated_count = memtable_->GetImpl().Count();
@@ -1336,11 +1337,9 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
 
     for (size_t i = 0; i < entries.size(); ++i) {
       const auto &e = entries[i];
-      if (e.value_len == 0)
-        continue;
       KeyRef k{key_base + e.key_offset, e.key_len};
-      key_locations.push_back(
-          {k, DataSource::MemTable, 0, static_cast<uint32_t>(i)});
+      key_locations.push_back({k, DataSource::MemTable, 0,
+                               static_cast<uint32_t>(i), e.value_len == 0});
     }
   }
 
@@ -1352,12 +1351,10 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
 
     for (size_t i = 0; i < entries.size(); ++i) {
       const auto &e = entries[i];
-      if (e.value_len == 0)
-        continue;
       KeyRef k{key_base + e.key_offset, e.key_len};
       key_locations.push_back({k, DataSource::Immutable,
                                static_cast<uint32_t>(imm_idx - 1),
-                               static_cast<uint32_t>(i)});
+                               static_cast<uint32_t>(i), e.value_len == 0});
     }
   }
 
@@ -1380,10 +1377,12 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
   for (const auto &loc : key_locations) {
     if (first || !(loc.key == last_key)) {
       mem_keys.push_back(loc.key);
-      if (loc.source == DataSource::MemTable) {
-        memtable_rows.push_back(loc.row_idx);
-      } else {
-        immutable_rows[loc.source_id].push_back(loc.row_idx);
+      if (!loc.is_tombstone) {
+        if (loc.source == DataSource::MemTable) {
+          memtable_rows.push_back(loc.row_idx);
+        } else {
+          immutable_rows[loc.source_id].push_back(loc.row_idx);
+        }
       }
       last_key = loc.key;
       first = false;

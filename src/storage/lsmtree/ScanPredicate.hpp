@@ -40,17 +40,18 @@ inline bool ZoneMapMayMatch(const ZoneMap &zone, const ScanPredicate &pred) {
     int c = pred.const_int;
 
     switch (pred.op) {
-    case Op::Greater:         return zone_max > c;
+    case Op::Greater: return zone_max > c;
     case Op::GreaterOrEquals: return zone_max >= c;
-    case Op::Less:            return zone_min < c;
-    case Op::LessOrEquals:    return zone_min <= c;
-    case Op::Equals:          return c >= zone_min && c <= zone_max;
-    case Op::NotEquals:       return !(zone_min == zone_max && zone_min == c);
+    case Op::Less: return zone_min < c;
+    case Op::LessOrEquals: return zone_min <= c;
+    case Op::Equals: return c >= zone_min && c <= zone_max;
+    case Op::NotEquals: return !(zone_min == zone_max && zone_min == c);
     }
     break;
   }
   case ValueType::Type::Double: {
-    if (zone.min.size() != sizeof(double) || zone.max.size() != sizeof(double)) {
+    if (zone.min.size() != sizeof(double) ||
+        zone.max.size() != sizeof(double)) {
       return true;
     }
     double zone_min = 0.0, zone_max = 0.0;
@@ -59,12 +60,12 @@ inline bool ZoneMapMayMatch(const ZoneMap &zone, const ScanPredicate &pred) {
     double c = pred.const_double;
 
     switch (pred.op) {
-    case Op::Greater:         return zone_max > c;
+    case Op::Greater: return zone_max > c;
     case Op::GreaterOrEquals: return zone_max >= c;
-    case Op::Less:            return zone_min < c;
-    case Op::LessOrEquals:    return zone_min <= c;
-    case Op::Equals:          return c >= zone_min && c <= zone_max;
-    case Op::NotEquals:       return !(zone_min == zone_max && zone_min == c);
+    case Op::Less: return zone_min < c;
+    case Op::LessOrEquals: return zone_min <= c;
+    case Op::Equals: return c >= zone_min && c <= zone_max;
+    case Op::NotEquals: return !(zone_min == zone_max && zone_min == c);
     }
     break;
   }
@@ -72,17 +73,16 @@ inline bool ZoneMapMayMatch(const ZoneMap &zone, const ScanPredicate &pred) {
     const auto &c = pred.const_string;
 
     switch (pred.op) {
-    case Op::Greater:         return zone.max > c;
+    case Op::Greater: return zone.max > c;
     case Op::GreaterOrEquals: return zone.max >= c;
-    case Op::Less:            return zone.min < c;
-    case Op::LessOrEquals:    return zone.min <= c;
-    case Op::Equals:          return c >= zone.min && c <= zone.max;
-    case Op::NotEquals:       return !(zone.min == zone.max && zone.min == c);
+    case Op::Less: return zone.min < c;
+    case Op::LessOrEquals: return zone.min <= c;
+    case Op::Equals: return c >= zone.min && c <= zone.max;
+    case Op::NotEquals: return !(zone.min == zone.max && zone.min == c);
     }
     break;
   }
-  default:
-    return true;
+  default: return true;
   }
 
   return true;

@@ -48,6 +48,7 @@ static void RegisterChecker() {
   Checker::RegisterKeyWord("KEY");
   Checker::RegisterKeyWord("FLUSH");
   Checker::RegisterKeyWord("NULL");
+  Checker::RegisterKeyWord("DELETE");
 
   Checker::RegisterType("INT");
   Checker::RegisterType("STRING");

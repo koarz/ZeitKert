@@ -73,6 +73,9 @@ public:
     case StatementType::InsertStatement:
       LOG_INFO("Execute: INSERT statement");
       break;
+    case StatementType::DeleteStatement:
+      LOG_INFO("Execute: DELETE statement");
+      break;
     }
 
     status = planner.QueryPlan();

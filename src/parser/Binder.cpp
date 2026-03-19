@@ -46,6 +46,9 @@ Status Binder::Parse(std::string_view query,
   case ASTNodeType::FlushQuery:
     statement_ = Transform::TransFlushQuery(parser_.tree_, message, context);
     break;
+  case ASTNodeType::DeleteQuery:
+    statement_ = Transform::TransDeleteQuery(parser_.tree_, message, context);
+    break;
   default:
   }
   if (statement_ == nullptr) {

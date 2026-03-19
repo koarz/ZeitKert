@@ -3,6 +3,7 @@
 #include "common/Status.hpp"
 #include "common/util/StringUtil.hpp"
 #include "parser/ASTCreateQuery.hpp"
+#include "parser/ASTDeleteQuery.hpp"
 #include "parser/ASTDropQuery.hpp"
 #include "parser/ASTFlushQuery.hpp"
 #include "parser/ASTInsertQuery.hpp"
@@ -48,11 +49,13 @@ Status Parser::Parse(TokenIterator &iterator) {
       status = ParseInsert(iterator);
     } else if (str == "FLUSH") {
       status = ParseFlush(iterator);
+    } else if (str == "DELETE") {
+      status = ParseDelete(iterator);
     }
   } else {
     status = Status::Error(ErrorCode::SyntaxError,
                            "ZeitKert Just Support CREATE, USE, SHOW, DROP, "
-                           "SELECT, INSERT, FLUSH Query");
+                           "SELECT, INSERT, FLUSH, DELETE Query");
   }
   return status;
 }
@@ -358,6 +361,39 @@ Status Parser::ParseFlush(TokenIterator &iterator) {
                          "Unexpected token after table name");
   }
   tree_ = std::make_shared<FlushQuery>(std::move(table_name));
+  return Status::OK();
+}
+
+Status Parser::ParseDelete(TokenIterator &iterator) {
+  // 解析 DELETE FROM <table> [WHERE <condition>]
+  ++iterator;
+  std::string s{iterator->begin, iterator->end};
+  if (!Checker::IsKeyWord(s) || s != "FROM") {
+    return Status::Error(ErrorCode::SyntaxError, "Expected FROM after DELETE");
+  }
+  ++iterator;
+  if (iterator->type != TokenType::BareWord) {
+    return Status::Error(ErrorCode::SyntaxError,
+                         "Expected table name after DELETE FROM");
+  }
+  std::string table_name{iterator->begin, iterator->end};
+  tree_ = std::make_shared<DeleteQuery>(std::move(table_name));
+
+  // 解析可选的 WHERE 子句
+  auto next = iterator;
+  ++next;
+  if (!next->isEnd()) {
+    std::string kw{next->begin, next->end};
+    if (Checker::IsKeyWord(kw) && kw == "WHERE") {
+      ++next; // 跳过 WHERE
+      std::optional<TokenIterator> where_begin{next};
+      while (!(++next)->isEnd())
+        ;
+      std::optional<TokenIterator> where_end{next};
+      tree_->children_.emplace_back(
+          std::make_shared<ASTToken>(where_begin, where_end));
+    }
+  }
   return Status::OK();
 }
 

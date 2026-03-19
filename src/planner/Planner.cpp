@@ -5,6 +5,7 @@
 #include "parser/binder/BoundColumnMeta.hpp"
 #include "parser/binder/BoundFunction.hpp"
 #include "parser/binder/BoundTuple.hpp"
+#include "parser/statement/DeleteStatement.hpp"
 #include "parser/statement/InsertStatement.hpp"
 #include "parser/statement/SelectStatement.hpp"
 #include "planner/AbstractPlanNode.hpp"
@@ -26,6 +27,8 @@ Status Planner::QueryPlan() {
     return PlanSelect(static_cast<SelectStatement &>(*statement));
   } else if (statement->type == StatementType::InsertStatement) {
     return PlanInsert(static_cast<InsertStatement &>(*statement));
+  } else if (statement->type == StatementType::DeleteStatement) {
+    return PlanDelete(static_cast<DeleteStatement &>(*statement));
   }
   return Status::OK();
 }

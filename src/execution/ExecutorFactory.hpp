@@ -1,6 +1,7 @@
 #pragma once
 
 #include "execution/AbstractExecutor.hpp"
+#include "execution/DeleteExecutor.hpp"
 #include "execution/FilterExecutor.hpp"
 #include "execution/FunctionExecutor.hpp"
 #include "execution/InsertExecutor.hpp"
@@ -10,6 +11,7 @@
 #include "execution/TupleExecutor.hpp"
 #include "execution/ValuesExecutor.hpp"
 #include "planner/AbstractPlanNode.hpp"
+#include "planner/DeletePlanNode.hpp"
 #include "planner/FilterPlanNode.hpp"
 #include "planner/FunctionPlanNode.hpp"
 #include "planner/InsertPlanNode.hpp"
@@ -89,9 +91,14 @@ struct ExecutorFactory {
       return std::make_unique<RangeExecutor>(p.GetSchemaRef(), p.GetStart(),
                                              p.GetStop(), p.GetStep());
     }
+    case PlanType::Delete: {
+      auto &p = static_cast<DeletePlanNode &>(*plan);
+      return std::make_unique<DeleteExecutor>(
+          p.GetSchemaRef(), p.GetTableMeta(), p.GetLSMTree(), p.GetCondition(),
+          p.GetConditionColumns());
+    }
     case PlanType::IndexScan:
     case PlanType::Update:
-    case PlanType::Delete:
     case PlanType::Aggregation:
     case PlanType::Limit:
     case PlanType::NestedLoopJoin:
