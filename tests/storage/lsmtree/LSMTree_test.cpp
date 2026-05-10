@@ -78,7 +78,9 @@ TEST(LSMTreeTest, MemtableToImmutableTest) {
     EXPECT_EQ(v, i);
   }
 
-  EXPECT_TRUE(lsm.GetImmutableSize() > 0);
+  // 异步刷盘后 immutable 队列会被后台线程消化，因此通过 L0 SSTable 数验证
+  // memtable→immutable→SSTable 的链路确实发生过
+  EXPECT_TRUE(lsm.GetL0FileCount() > 0);
 }
 
 TEST(LSMTreeTest, RemoveTest) {

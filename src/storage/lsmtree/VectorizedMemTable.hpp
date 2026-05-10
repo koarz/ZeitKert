@@ -34,7 +34,7 @@ namespace DB {
  */
 class VectorizedMemTable {
 public:
-  // 整数主键 Entry - 12B，缓存行可容纳 5 个
+  // 整数主键 Entry - 16B，缓存行可容纳 5 个
   struct IntEntry {
     int key;
     uint32_t value_offset;

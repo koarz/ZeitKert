@@ -18,7 +18,7 @@
 namespace DB {
 Status TableOperator::BuildSSTable(
     std::filesystem::path path, uint32_t &table_id,
-    std::vector<MemTableRef> &memtables,
+    const std::vector<MemTable *> &memtables,
     const std::vector<std::shared_ptr<ValueType>> &column_types,
     uint16_t primary_key_idx, SSTableRef &sstable_meta) {
   SSTableBuilder builder(path, table_id, column_types, primary_key_idx);

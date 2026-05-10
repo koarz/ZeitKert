@@ -9,6 +9,7 @@
 #include "storage/lsmtree/BloomFilter.hpp"
 #include "storage/lsmtree/ColumnReader.hpp"
 #include "storage/lsmtree/CompactionScheduler.hpp"
+#include "storage/lsmtree/FlushScheduler.hpp"
 #include "storage/lsmtree/Manifest.hpp"
 #include "storage/lsmtree/MemTable.hpp"
 #include "storage/lsmtree/RowCodec.hpp"
@@ -364,15 +365,26 @@ LSMTree::LSMTree(std::filesystem::path table_path,
   // 创建并启动 compaction 调度器
   compaction_scheduler_ = std::make_unique<CompactionScheduler>(this);
   compaction_scheduler_->Start();
+
+  // 创建并启动 flush 调度器（必须在 compaction 之后启动，
+  // 因为 flush 完成后会调用 compaction_scheduler_->MaybeScheduleCompaction）
+  flush_scheduler_ = std::make_unique<FlushScheduler>(this);
+  flush_scheduler_->Start();
 }
 
 LSMTree::~LSMTree() {
-  // 先停止 compaction 调度器
+  // 先停止 flush 调度器：会把队列里剩余的 immutable 全部刷盘
+  if (flush_scheduler_) {
+    flush_scheduler_->Stop();
+  }
+
+  // 再停止 compaction 调度器
   if (compaction_scheduler_) {
     compaction_scheduler_->Stop();
   }
 
-  // 逐个刷盘所有 immutable tables，并删除对应的 WAL 文件
+  // 调度器停止后理论上 immutable_table_ 已空；但极端情况下（构造期 bypass）
+  // 仍可能有残留，做一次同步兜底刷盘
   while (!immutable_table_.empty()) {
     auto &imm = immutable_table_.front();
     // 跳过空的 immutable table
@@ -381,26 +393,22 @@ LSMTree::~LSMTree() {
       immutable_table_.erase(immutable_table_.begin());
       continue;
     }
-    std::vector<MemTableRef> to_flush;
-    to_flush.push_back(std::move(imm));
-    immutable_table_.erase(immutable_table_.begin());
-
     auto sstable_id = GetNextTableId();
     auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
     table_meta->sstable_id_ = sstable_id;
 
     uint32_t out_id = sstable_id;
-    std::ignore = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
+    std::vector<MemTable *> ptrs{imm.get()};
+    std::ignore = TableOperator::BuildSSTable(column_path_, out_id, ptrs,
                                               column_types_, primary_key_idx_,
                                               table_meta);
 
     // 添加到 L0
     AddToL0(sstable_id, table_meta);
 
-    // 刷盘后删除 WAL 文件
-    for (auto &mem : to_flush) {
-      mem->DeleteWal();
-    }
+    // 刷盘后删除 WAL 文件并从队列移除
+    imm->DeleteWal();
+    immutable_table_.erase(immutable_table_.begin());
   }
 
   // 保存 manifest
@@ -440,40 +448,31 @@ Status LSMTree::Insert(const Slice &key, const Slice &value) {
   // MemTable 到达 SSTable 大小后转不可变
   if (size >= SSTABLE_SIZE) {
     LOG_INFO("MemTable full (size={}), converting to immutable", size);
-    std::unique_lock imm_lock(immutable_latch_);
-    memtable_->ToImmutable();
-    immutable_table_.push_back(std::move(memtable_));
-    if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
-      LOG_INFO("Immutable buffer full, flushing oldest to SSTable");
-      // 缓冲区满，刷最老的 immutable 为 SSTable
-      std::vector<MemTableRef> to_flush;
-      to_flush.push_back(std::move(immutable_table_.front()));
-      immutable_table_.erase(immutable_table_.begin());
-
-      auto sstable_id = GetNextTableId();
-      auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
-      table_meta->sstable_id_ = sstable_id;
-
-      uint32_t out_id = sstable_id;
-      auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
-                                           column_types_, primary_key_idx_,
-                                           table_meta);
-      if (!s.ok()) {
-        return s;
+    {
+      std::unique_lock imm_lock(immutable_latch_);
+      memtable_->ToImmutable();
+      immutable_table_.push_back(std::move(memtable_));
+    }
+    // 异步触发刷盘
+    if (flush_scheduler_) {
+      flush_scheduler_->NotifyFlush();
+    }
+    // 背压：immutable 队列过长时等待后台线程消化
+    while (true) {
+      size_t imm_size;
+      {
+        std::shared_lock imm_lock(immutable_latch_);
+        imm_size = immutable_table_.size();
       }
-
-      // 添加到 L0
-      AddToL0(sstable_id, table_meta);
-
-      // 刷盘后删除 WAL 文件
-      for (auto &mem : to_flush) {
-        mem->DeleteWal();
+      if (imm_size < MAX_IMMUTABLE_COUNT) {
+        break;
       }
-
-      // 触发 compaction 检查
-      if (compaction_scheduler_) {
-        compaction_scheduler_->MaybeScheduleCompaction();
+      // 释放 latch_ 以避免阻塞读路径
+      lock.unlock();
+      if (flush_scheduler_) {
+        flush_scheduler_->WaitUntilDrained();
       }
+      lock.lock();
     }
     // 创建新的 memtable，使用新的 WAL 序号
     auto pk_type = column_types_.empty()
@@ -511,35 +510,30 @@ Status LSMTree::BatchInsert(std::vector<std::pair<Slice, Slice>> &entries) {
 
       LOG_INFO("BatchInsert: MemTable full (size={}), converting to immutable",
                size);
-      std::unique_lock imm_lock(immutable_latch_);
-      memtable_->ToImmutable();
-      immutable_table_.push_back(std::move(memtable_));
-      if (immutable_table_.size() >= MAX_IMMUTABLE_COUNT) {
-        LOG_INFO("BatchInsert: Immutable buffer full, flushing oldest");
-        std::vector<MemTableRef> to_flush;
-        to_flush.push_back(std::move(immutable_table_.front()));
-        immutable_table_.erase(immutable_table_.begin());
-
-        auto sstable_id = GetNextTableId();
-        auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
-        table_meta->sstable_id_ = sstable_id;
-
-        uint32_t out_id = sstable_id;
-        auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
-                                             column_types_, primary_key_idx_,
-                                             table_meta);
-        if (!s.ok()) {
-          return s;
+      {
+        std::unique_lock imm_lock(immutable_latch_);
+        memtable_->ToImmutable();
+        immutable_table_.push_back(std::move(memtable_));
+      }
+      // 异步触发刷盘
+      if (flush_scheduler_) {
+        flush_scheduler_->NotifyFlush();
+      }
+      // 背压：immutable 队列过长时等待
+      while (true) {
+        size_t imm_size;
+        {
+          std::shared_lock imm_lock(immutable_latch_);
+          imm_size = immutable_table_.size();
         }
-
-        AddToL0(sstable_id, table_meta);
-        for (auto &mem : to_flush) {
-          mem->DeleteWal();
+        if (imm_size < MAX_IMMUTABLE_COUNT) {
+          break;
         }
-
-        if (compaction_scheduler_) {
-          compaction_scheduler_->MaybeScheduleCompaction();
+        lock.unlock();
+        if (flush_scheduler_) {
+          flush_scheduler_->WaitUntilDrained();
         }
+        lock.lock();
       }
 
       auto pk_type = column_types_.empty()
@@ -1518,58 +1512,26 @@ SelectionVector LSMTree::BuildSelectionVectorString() {
 
 Status LSMTree::FlushToSST() {
   LOG_INFO("FlushToSST: starting flush");
-  std::unique_lock lock(latch_);
-  std::unique_lock imm_lock(immutable_latch_);
 
+  // 把当前 memtable 转为 immutable 并入队
   auto pk_type = column_types_.empty()
                      ? ValueType::Type::String
                      : column_types_[primary_key_idx_]->GetType();
-
-  // 如果当前 memtable_ 有数据，先转为 immutable
-  if (memtable_->GetApproximateSize() > 0) {
-    memtable_->ToImmutable();
-    immutable_table_.push_back(std::move(memtable_));
-    // 创建新的 memtable
-    memtable_ = std::make_unique<MemTable>(
-        MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
+  {
+    std::unique_lock lock(latch_);
+    std::unique_lock imm_lock(immutable_latch_);
+    if (memtable_->GetApproximateSize() > 0) {
+      memtable_->ToImmutable();
+      immutable_table_.push_back(std::move(memtable_));
+      memtable_ = std::make_unique<MemTable>(
+          MakeWalPath(column_path_, wal_number_++), write_log_, pk_type, false);
+    }
   }
 
-  // 将所有 immutable tables 刷盘为 SST 文件
-  while (!immutable_table_.empty()) {
-    auto &imm = immutable_table_.front();
-
-    // 跳过空的 immutable table
-    if (imm->GetApproximateSize() == 0) {
-      imm->DeleteWal();
-      immutable_table_.erase(immutable_table_.begin());
-      continue;
-    }
-
-    std::vector<MemTableRef> to_flush;
-    to_flush.push_back(std::move(imm));
-    immutable_table_.erase(immutable_table_.begin());
-
-    auto sstable_id = GetNextTableId();
-    auto &table_meta = sstables_[sstable_id] = std::make_shared<SSTable>();
-    table_meta->sstable_id_ = sstable_id;
-
-    uint32_t out_id = sstable_id;
-    auto s = TableOperator::BuildSSTable(column_path_, out_id, to_flush,
-                                         column_types_, primary_key_idx_,
-                                         table_meta);
-    if (!s.ok()) {
-      return s;
-    }
-
-    LOG_INFO("FlushToSST: flushed to SSTable {}", sstable_id);
-
-    // 添加到 L0
-    AddToL0(sstable_id, table_meta);
-
-    // 刷盘后删除 WAL 文件
-    for (auto &mem : to_flush) {
-      mem->DeleteWal();
-    }
+  // 通知后台线程并同步等待 immutable 队列全部刷盘完成
+  if (flush_scheduler_) {
+    flush_scheduler_->NotifyFlush();
+    flush_scheduler_->WaitUntilDrained();
   }
 
   // 触发 compaction 检查
@@ -1903,6 +1865,75 @@ Status LSMTree::ScanColumnsWithPredicates(
   }
 
   return Status::OK();
+}
+
+bool LSMTree::ImmutableQueueEmptyForFlush() {
+  std::shared_lock imm_lock(immutable_latch_);
+  return immutable_table_.empty();
+}
+
+bool LSMTree::FlushOldestImmutable() {
+  // 1. 取队首的 raw 指针（不移动 unique_ptr，使其在构建期间仍对读路径可见）
+  MemTable *imm_ptr = nullptr;
+  {
+    std::shared_lock imm_lock(immutable_latch_);
+    if (immutable_table_.empty()) {
+      return false;
+    }
+    imm_ptr = immutable_table_.front().get();
+  }
+
+  // 跳过空 immutable：直接在写锁里清掉
+  if (imm_ptr->GetApproximateSize() == 0) {
+    std::unique_lock imm_lock(immutable_latch_);
+    if (!immutable_table_.empty() &&
+        immutable_table_.front().get() == imm_ptr) {
+      immutable_table_.front()->DeleteWal();
+      immutable_table_.erase(immutable_table_.begin());
+    }
+    return true;
+  }
+
+  // 2. 预分配 SSTable id（拿写锁，这一步很短）
+  auto sstable_id = GetNextTableId();
+  auto table_meta = std::make_shared<SSTable>();
+  table_meta->sstable_id_ = sstable_id;
+
+  // 3. 不持任何锁地构建 SSTable（耗时的 IO 在这里发生）
+  uint32_t out_id = sstable_id;
+  std::vector<MemTable *> ptrs{imm_ptr};
+  auto s = TableOperator::BuildSSTable(column_path_, out_id, ptrs,
+                                       column_types_, primary_key_idx_,
+                                       table_meta);
+  if (!s.ok()) {
+    LOG_ERROR("FlushOldestImmutable: BuildSSTable failed: {}", s.GetMessage());
+    return true; // 即使失败也返回 true，让调度器继续尝试下一轮
+  }
+
+  // 4. 注册 SSTable 并把 immutable 出队（同一个临界区，原子可见）
+  {
+    std::unique_lock lock(latch_);
+    sstables_[sstable_id] = table_meta;
+  }
+  AddToL0(sstable_id, table_meta);
+
+  {
+    std::unique_lock imm_lock(immutable_latch_);
+    if (!immutable_table_.empty() &&
+        immutable_table_.front().get() == imm_ptr) {
+      immutable_table_.front()->DeleteWal();
+      immutable_table_.erase(immutable_table_.begin());
+    }
+  }
+
+  LOG_INFO("FlushOldestImmutable: flushed to SSTable {}", sstable_id);
+
+  // 5. 通知 compaction 检查是否需要 compact
+  if (compaction_scheduler_) {
+    compaction_scheduler_->MaybeScheduleCompaction();
+  }
+
+  return true;
 }
 
 } // namespace DB

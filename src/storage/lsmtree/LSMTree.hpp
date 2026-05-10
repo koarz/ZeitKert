@@ -26,6 +26,7 @@ namespace DB {
 // 前向声明
 class Manifest;
 class CompactionScheduler;
+class FlushScheduler;
 
 class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   std::shared_mutex latch_;
@@ -48,6 +49,7 @@ class LSMTree : public IndexEngine<Slice, Slice, SliceCompare> {
   std::vector<LevelMeta> levels_;
   std::unique_ptr<Manifest> manifest_;
   std::unique_ptr<CompactionScheduler> compaction_scheduler_;
+  std::unique_ptr<FlushScheduler> flush_scheduler_;
   std::atomic<uint32_t> next_table_id_{0};
 
   // 主键类型特化的 BuildSelectionVector 实现
@@ -151,5 +153,16 @@ public:
 
   // 获取 L0 文件数（测试用）
   size_t GetL0FileCount() const;
+
+  // —— FlushScheduler 用的辅助接口 ——
+  // 检查 immutable_table_ 是否为空（仅用于后台线程的等待 predicate）
+  bool ImmutableQueueEmptyForFlush();
+
+  // 把 immutable_table_ 队首的一个 MemTable 刷成 SSTable 并从队列移除。
+  // 返回 false 表示队列已空、本次没刷
+  // 关键点：构建 SSTable 期间 MemTable 仍在 immutable_table_ 中可见，
+  // 只有当 SSTable 注册到 sstables_/levels_ 之后，才在同一个临界区里
+  // 把 MemTable 移出并 DeleteWal
+  bool FlushOldestImmutable();
 };
 } // namespace DB
