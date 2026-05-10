@@ -131,6 +131,13 @@ public:
 
   // 写入 KV 对 - O(1) 追加
   Status Put(const Slice &key, const Slice &value) {
+    // 先落 WAL 再追加内存：保证崩溃时 WAL 中的记录是 in-memory 状态的超集
+    // WAL 失败直接返回，不修改任何 in-memory 数据
+    auto wal_status = wal_.WriteSlice(key, value);
+    if (!wal_status.ok()) {
+      return wal_status;
+    }
+
     uint32_t value_len = static_cast<uint32_t>(value.Size());
 
     // 分配并写入 value
@@ -169,7 +176,7 @@ public:
                                 std::memory_order_relaxed);
     sorted_ = false;
 
-    return wal_.WriteSlice(key, value);
+    return Status::OK();
   }
 
   // 点查 - 需要排序后二分查找
