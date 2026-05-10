@@ -7,25 +7,38 @@
 #include <tuple>
 
 namespace DB {
-Status ScanColumnExecutor::Execute() {
+
+Status ScanColumnExecutor::Init() {
   if (!lsm_tree_) {
     return Status::Error(ErrorCode::NotFound, "Table storage not initialized");
   }
 
-  ColumnPtr column;
-
-  // 如果 Filter 已经预先扫描并过滤了数据，直接使用过滤后的列
+  // 优先复用 Filter 在 Init 阶段填入缓存的过滤后数据
   if (FilteredDataCache::IsActive()) {
-    column = FilteredDataCache::Get(column_meta_->name_);
+    column_ = FilteredDataCache::Get(column_meta_->name_);
   }
 
-  // 如果缓存中没有，正常扫描
-  if (!column) {
-    std::ignore = lsm_tree_->ScanColumn(column_idx_, column);
+  // 缓存未命中则真正发起列扫描
+  if (!column_) {
+    std::ignore = lsm_tree_->ScanColumn(column_idx_, column_);
   }
-
-  schema_->GetColumns().emplace_back(std::make_shared<ColumnWithNameType>(
-      column, column_meta_->name_, column_meta_->type_));
+  emitted_ = false;
   return Status::OK();
 }
+
+Status ScanColumnExecutor::Next(DataChunk &out) {
+  // 第二次及以后调用：返回空 chunk 表示 EOF
+  if (emitted_ || !column_) {
+    return Status::OK();
+  }
+
+  // 第一次调用：把整列封装成命名列发射出去
+  // 注：这里保持单批次发射以保留 ColumnVector::DataSpan 的 zero-copy 语义
+  auto named = std::make_shared<ColumnWithNameType>(column_, column_meta_->name_,
+                                                    column_meta_->type_);
+  out.AddColumn(named, column_->Size());
+  emitted_ = true;
+  return Status::OK();
+}
+
 } // namespace DB

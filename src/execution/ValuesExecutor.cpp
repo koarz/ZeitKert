@@ -9,7 +9,18 @@
 #include <memory>
 
 namespace DB {
-Status ValuesExecutor::Execute() {
+
+Status ValuesExecutor::Init() {
+  emitted_ = false;
+  return Status::OK();
+}
+
+Status ValuesExecutor::Next(DataChunk &out) {
+  // 一次性发射所有字面量；之后返回空 chunk 表示 EOF
+  if (emitted_) {
+    return Status::OK();
+  }
+
   for (auto &v : plan_->values_) {
     auto &value = static_cast<BoundConstant &>(*v);
     ColumnPtr col;
@@ -27,16 +38,20 @@ Status ValuesExecutor::Execute() {
       static_cast<ColumnVector<double> &>(*col).Insert(value.value_.f64);
       break;
     case ValueType::Type::Null:
+      // NULL 字面量当作 1 行 0 值并设置 null bitmap
       col = std::make_shared<ColumnVector<int>>();
       static_cast<ColumnVector<int> &>(*col).Insert(0);
       col->SetNull(0);
       break;
     }
+
     auto col_name = value.ToString();
-    auto column =
-        std::make_shared<ColumnWithNameType>(col, col_name, value.type_);
-    schema_->GetColumns().push_back(column);
+    auto named = std::make_shared<ColumnWithNameType>(col, col_name, value.type_);
+    out.AddColumn(named);
   }
+
+  emitted_ = true;
   return Status::OK();
 }
+
 } // namespace DB

@@ -13,6 +13,10 @@
 #include <vector>
 
 namespace DB {
+// 删除算子（向量化版本）
+//
+// 终结态算子：Init 阶段扫描主键 + 求值 WHERE + 执行 Remove，
+// Next 一次性发射 "DeleteRows: N" 结果列后立即 EOF
 class DeleteExecutor : public AbstractExecutor {
   TableMetaRef table_meta_;
   std::shared_ptr<LSMTree> lsm_tree_;
@@ -21,6 +25,10 @@ class DeleteExecutor : public AbstractExecutor {
 
   // WHERE 条件中列名到列数据的映射
   std::unordered_map<std::string, ColumnPtr> condition_column_data_;
+
+  // 写入完成后缓存的删除行数
+  uint32_t deleted_rows_{0};
+  bool emitted_{false};
 
   // 递归求值 WHERE 条件表达式
   ColumnPtr EvalCondition(const BoundExpressRef &expr);
@@ -40,6 +48,7 @@ public:
 
   ~DeleteExecutor() override = default;
 
-  Status Execute() override;
+  Status Init() override;
+  Status Next(DataChunk &out) override;
 };
 } // namespace DB

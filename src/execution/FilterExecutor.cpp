@@ -212,22 +212,7 @@ Status FilterExecutor::ScanConditionColumns() {
   return Status::OK();
 }
 
-Status FilterExecutor::Execute() {
-  if (!condition_) {
-    // 没有 WHERE 条件，直接执行子节点
-    Status status;
-    for (auto &child : children_) {
-      status = child->Execute();
-      if (!status.ok()) {
-        return status;
-      }
-      for (auto col : child->GetSchema()->GetColumns()) {
-        schema_->GetColumns().push_back(col);
-      }
-    }
-    return Status::OK();
-  }
-
+Status FilterExecutor::PrepareFilteredData() {
   // 1. 提取可下推谓词
   std::vector<ScanPredicate> pushed_predicates;
   bool all_pushed = true;
@@ -326,23 +311,48 @@ Status FilterExecutor::Execute() {
 
   // 激活缓存
   FilteredDataCache::Activate();
+  cache_activated_ = true;
+  return Status::OK();
+}
 
-  // 执行子节点 (Projection)
-  Status status;
-  for (auto &child : children_) {
-    status = child->Execute();
+Status FilterExecutor::Init() {
+  if (condition_) {
+    auto status = PrepareFilteredData();
     if (!status.ok()) {
-      FilteredDataCache::Clear();
       return status;
-    }
-    for (auto col : child->GetSchema()->GetColumns()) {
-      schema_->GetColumns().push_back(col);
     }
   }
 
-  // 清理缓存
-  FilteredDataCache::Clear();
+  // 子节点（典型为 Projection）初始化时会从 FilteredDataCache 读过滤后的数据
+  for (auto &child : children_) {
+    auto status = child->Init();
+    if (!status.ok()) {
+      return status;
+    }
+  }
+  return Status::OK();
+}
 
+Status FilterExecutor::Next(DataChunk &out) {
+  // Volcano 风格：从每个子节点拉一个 chunk，按列拼接到 out
+  // 任一子节点 EOF 即整体 EOF（与 Projection 的语义一致）
+  size_t row_count = 0;
+  for (auto &child : children_) {
+    DataChunk child_chunk;
+    auto status = child->Next(child_chunk);
+    if (!status.ok()) {
+      return status;
+    }
+    if (child_chunk.IsEmpty()) {
+      out.Reset();
+      return Status::OK();
+    }
+    row_count = std::max(row_count, child_chunk.row_count());
+    for (auto &col : child_chunk.columns()) {
+      out.AddColumn(col, col->Size());
+    }
+  }
+  out.set_row_count(row_count);
   return Status::OK();
 }
 

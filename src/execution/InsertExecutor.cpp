@@ -2,8 +2,10 @@
 #include "common/Logger.hpp"
 #include "common/Status.hpp"
 #include "storage/column/ColumnVector.hpp"
+#include "storage/column/ColumnWithNameType.hpp"
 #include "storage/lsmtree/RowCodec.hpp"
 #include "storage/lsmtree/Slice.hpp"
+#include "type/Int.hpp"
 
 #include <memory>
 #include <string>
@@ -11,7 +13,7 @@
 #include <vector>
 
 namespace DB {
-Status InsertExecutor::Execute() {
+Status InsertExecutor::Init() {
   Status status;
   if (!lsm_tree_) {
     return Status::Error(ErrorCode::InsertError,
@@ -19,7 +21,7 @@ Status InsertExecutor::Execute() {
   }
   auto col_meta = table_meta_->GetColumns();
   auto &row_number = table_meta_->GetRowNumber();
-  uint32_t inserted_row = 0;
+  inserted_rows_ = 0;
 
   // 检查是否有 unique key
   int unique_col_idx = -1;
@@ -133,61 +135,89 @@ Status InsertExecutor::Execute() {
     if (!status.ok()) {
       return status;
     }
-    inserted_row = static_cast<uint32_t>(all_entries.size());
+    inserted_rows_ = static_cast<uint32_t>(all_entries.size());
   } else {
+    // VALUES (...) 路径：从子节点拉取 chunk，按行编码后写入
     for (auto &child : children_) {
-      status = child->Execute();
+      status = child->Init();
       if (!status.ok()) {
         return status;
       }
-      if (child->GetSchema()->GetColumns().size() != col_meta.size()) {
-        return Status::Error(ErrorCode::InsertError,
-                             "Some tuple size is not match table's column num");
-      }
-      auto &columns = child->GetSchema()->GetColumns();
-      size_t row_count = columns.empty() ? 0 : columns[0]->Size();
-      for (size_t col_idx = 1; col_idx < columns.size(); col_idx++) {
-        if (columns[col_idx]->Size() != row_count) {
-          return Status::Error(ErrorCode::InsertError,
-                               "Column size mismatch in insert values");
-        }
-      }
-
-      for (size_t row_idx = 0; row_idx < row_count; row_idx++) {
-        Slice key;
-        auto unique_col = columns[unique_col_idx];
-        auto unique_value = unique_col->GetStrElement(row_idx);
-        switch (unique_col->GetValueType()->GetType()) {
-        case ValueType::Type::Int: key = Slice{std::stoi(unique_value)}; break;
-        case ValueType::Type::String: key = Slice{unique_value}; break;
-        case ValueType::Type::Double:
-          key = Slice{std::stod(unique_value)};
-          break;
-        case ValueType::Type::Null:
-          return Status::Error(ErrorCode::InsertError,
-                               "UNIQUE KEY column cannot be NULL");
-        }
-
-        std::string row_buffer;
-        row_buffer.reserve(128);
-        for (auto &col : columns) {
-          RowCodec::AppendValue(row_buffer, col->GetValueType()->GetType(),
-                                col->GetStrElement(row_idx));
-        }
-
-        status = lsm_tree_->Insert(key, Slice{row_buffer});
+      // 子节点（Tuple/Values）一次性发射，循环 Next 兼容未来分批
+      while (true) {
+        DataChunk chunk;
+        status = child->Next(chunk);
         if (!status.ok()) {
           return status;
         }
-        inserted_row++;
+        if (chunk.IsEmpty()) {
+          break;
+        }
+        if (chunk.column_count() != col_meta.size()) {
+          return Status::Error(
+              ErrorCode::InsertError,
+              "Some tuple size is not match table's column num");
+        }
+        // 校验所有列长度一致
+        size_t row_count = chunk.row_count();
+        for (size_t col_idx = 0; col_idx < chunk.column_count(); col_idx++) {
+          if (chunk.column(col_idx)->Size() != row_count) {
+            return Status::Error(ErrorCode::InsertError,
+                                 "Column size mismatch in insert values");
+          }
+        }
+
+        for (size_t row_idx = 0; row_idx < row_count; row_idx++) {
+          Slice key;
+          auto unique_col = chunk.column(unique_col_idx);
+          auto unique_value = unique_col->GetStrElement(row_idx);
+          switch (unique_col->GetValueType()->GetType()) {
+          case ValueType::Type::Int:
+            key = Slice{std::stoi(unique_value)};
+            break;
+          case ValueType::Type::String: key = Slice{unique_value}; break;
+          case ValueType::Type::Double:
+            key = Slice{std::stod(unique_value)};
+            break;
+          case ValueType::Type::Null:
+            return Status::Error(ErrorCode::InsertError,
+                                 "UNIQUE KEY column cannot be NULL");
+          }
+
+          std::string row_buffer;
+          row_buffer.reserve(128);
+          for (size_t c = 0; c < chunk.column_count(); c++) {
+            auto col = chunk.column(c);
+            RowCodec::AppendValue(row_buffer, col->GetValueType()->GetType(),
+                                  col->GetStrElement(row_idx));
+          }
+
+          status = lsm_tree_->Insert(key, Slice{row_buffer});
+          if (!status.ok()) {
+            return status;
+          }
+          inserted_rows_++;
+        }
       }
     }
   }
-  row_number += inserted_row;
+  row_number += inserted_rows_;
+  emitted_ = false;
+  return Status::OK();
+}
+
+Status InsertExecutor::Next(DataChunk &out) {
+  // 一次性发射 InsertRows 结果列；后续调用返回空 chunk 表示 EOF
+  if (emitted_) {
+    return Status::OK();
+  }
+
   auto res = std::make_shared<ColumnVector<int>>();
-  res->Insert(inserted_row);
-  this->schema_->GetColumns().push_back(std::make_shared<ColumnWithNameType>(
-      res, "InsertRows", std::make_shared<Int>()));
+  res->Insert(static_cast<int>(inserted_rows_));
+  auto named = std::make_shared<ColumnWithNameType>(res, "InsertRows",
+                                                    std::make_shared<Int>());
+  out.AddColumn(named);
+  emitted_ = true;
   return Status::OK();
 }
 } // namespace DB

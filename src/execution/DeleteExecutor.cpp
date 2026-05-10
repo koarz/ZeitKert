@@ -149,7 +149,10 @@ ColumnPtr DeleteExecutor::EvalCondition(const BoundExpressRef &expr) {
   }
 }
 
-Status DeleteExecutor::Execute() {
+Status DeleteExecutor::Init() {
+  emitted_ = false;
+  deleted_rows_ = 0;
+
   if (!lsm_tree_) {
     return Status::Error(ErrorCode::InsertError,
                          "Table storage not initialized");
@@ -179,17 +182,12 @@ Status DeleteExecutor::Execute() {
     return s;
   }
   if (pk_results.empty()) {
-    // 无数据，无需删除
-    auto res = std::make_shared<ColumnVector<int>>();
-    res->Insert(0);
-    schema_->GetColumns().push_back(std::make_shared<ColumnWithNameType>(
-        res, "DeleteRows", std::make_shared<Int>()));
+    // 无数据，无需删除：deleted_rows_ 保持 0
     return Status::OK();
   }
 
   auto &pk_column = pk_results[0];
   size_t total_rows = pk_column->Size();
-  uint32_t deleted_rows = 0;
 
   if (where_condition_) {
     // 扫描条件列
@@ -233,7 +231,7 @@ Status DeleteExecutor::Execute() {
         if (!s.ok()) {
           return s;
         }
-        deleted_rows++;
+        deleted_rows_++;
       }
     }
   } else {
@@ -263,19 +261,27 @@ Status DeleteExecutor::Execute() {
       if (!s.ok()) {
         return s;
       }
-      deleted_rows++;
+      deleted_rows_++;
     }
   }
 
   // 更新行数
-  table_meta_->GetRowNumber() -= deleted_rows;
+  table_meta_->GetRowNumber() -= deleted_rows_;
+  return Status::OK();
+}
 
-  // 输出删除行数
+Status DeleteExecutor::Next(DataChunk &out) {
+  // 一次性发射 DeleteRows 结果列；后续调用返回空 chunk 表示 EOF
+  if (emitted_) {
+    return Status::OK();
+  }
+
   auto res = std::make_shared<ColumnVector<int>>();
-  res->Insert(static_cast<int>(deleted_rows));
-  schema_->GetColumns().push_back(std::make_shared<ColumnWithNameType>(
-      res, "DeleteRows", std::make_shared<Int>()));
-
+  res->Insert(static_cast<int>(deleted_rows_));
+  auto named = std::make_shared<ColumnWithNameType>(res, "DeleteRows",
+                                                    std::make_shared<Int>());
+  out.AddColumn(named);
+  emitted_ = true;
   return Status::OK();
 }
 
