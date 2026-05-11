@@ -41,7 +41,8 @@ Status ProjectionExecutor::Init() {
 
 Status ProjectionExecutor::Next(DataChunk &out) {
   // 从每个子节点拉一个 chunk，按列拼接到 out
-  // 当前向量化模型下子节点都是 "一次发射全部 + EOF"，这里一次拉取就能拿到完整结果
+  // 当前向量化模型下子节点都是 "一次发射全部 +
+  // EOF"，这里一次拉取就能拿到完整结果
   size_t row_count = 0;
   for (auto &child : children_) {
     DataChunk child_chunk;

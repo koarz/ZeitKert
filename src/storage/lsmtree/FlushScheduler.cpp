@@ -31,9 +31,7 @@ void FlushScheduler::Stop() {
 void FlushScheduler::NotifyFlush() {
   // 不需要持锁修改原子值，但 notify 前要确保被唤醒方能看到 predicate
   // 这里用 lock_guard 保证可见性
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-  }
+  { std::lock_guard<std::mutex> lock(mutex_); }
   work_cv_.notify_one();
 }
 

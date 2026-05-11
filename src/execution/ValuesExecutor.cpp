@@ -46,7 +46,8 @@ Status ValuesExecutor::Next(DataChunk &out) {
     }
 
     auto col_name = value.ToString();
-    auto named = std::make_shared<ColumnWithNameType>(col, col_name, value.type_);
+    auto named =
+        std::make_shared<ColumnWithNameType>(col, col_name, value.type_);
     out.AddColumn(named);
   }
 

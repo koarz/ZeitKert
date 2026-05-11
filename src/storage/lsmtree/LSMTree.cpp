@@ -399,9 +399,9 @@ LSMTree::~LSMTree() {
 
     uint32_t out_id = sstable_id;
     std::vector<MemTable *> ptrs{imm.get()};
-    std::ignore = TableOperator::BuildSSTable(column_path_, out_id, ptrs,
-                                              column_types_, primary_key_idx_,
-                                              table_meta);
+    std::ignore =
+        TableOperator::BuildSSTable(column_path_, out_id, ptrs, column_types_,
+                                    primary_key_idx_, table_meta);
 
     // 添加到 L0
     AddToL0(sstable_id, table_meta);
@@ -1902,9 +1902,8 @@ bool LSMTree::FlushOldestImmutable() {
   // 3. 不持任何锁地构建 SSTable（耗时的 IO 在这里发生）
   uint32_t out_id = sstable_id;
   std::vector<MemTable *> ptrs{imm_ptr};
-  auto s = TableOperator::BuildSSTable(column_path_, out_id, ptrs,
-                                       column_types_, primary_key_idx_,
-                                       table_meta);
+  auto s = TableOperator::BuildSSTable(
+      column_path_, out_id, ptrs, column_types_, primary_key_idx_, table_meta);
   if (!s.ok()) {
     LOG_ERROR("FlushOldestImmutable: BuildSSTable failed: {}", s.GetMessage());
     return true; // 即使失败也返回 true，让调度器继续尝试下一轮

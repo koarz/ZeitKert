@@ -28,8 +28,8 @@ Transform::TransDeleteQuery(ASTPtr node, std::string &message,
     auto where_it = where_token.Begin();
     std::vector<TableMetaRef> tables{table_meta};
     std::vector<BoundExpressRef> dummy_columns;
-    auto where_expr =
-        ParseExpression(where_it, where_token.End(), tables, dummy_columns, message);
+    auto where_expr = ParseExpression(where_it, where_token.End(), tables,
+                                      dummy_columns, message);
     if (!message.empty()) {
       return nullptr;
     }

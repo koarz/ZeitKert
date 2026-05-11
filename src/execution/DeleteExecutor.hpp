@@ -41,8 +41,8 @@ public:
                  std::shared_ptr<LSMTree> lsm_tree,
                  BoundExpressRef where_condition,
                  std::vector<FilterColumnScan> condition_columns)
-      : AbstractExecutor(std::move(schema)),
-        table_meta_(std::move(table_meta)), lsm_tree_(std::move(lsm_tree)),
+      : AbstractExecutor(std::move(schema)), table_meta_(std::move(table_meta)),
+        lsm_tree_(std::move(lsm_tree)),
         where_condition_(std::move(where_condition)),
         condition_columns_(std::move(condition_columns)) {}
 

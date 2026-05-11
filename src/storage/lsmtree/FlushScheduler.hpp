@@ -18,7 +18,8 @@ class LSMTree;
 //      LSMTree::immutable_table_ 中，读路径照常能查到这些 key
 //   2. 只有当 SSTable 已注册到 sstables_/levels_ 后，才在同一个临界区里
 //      把对应的 MemTable 从 immutable_table_ 移除并删除 WAL
-//      读路径要么看到旧的 immutable，要么看到新的 SSTable，不会同时出现也不会都看不到
+//      读路径要么看到旧的 immutable，要么看到新的
+//      SSTable，不会同时出现也不会都看不到
 //
 // 信号语义：
 //   - NotifyFlush()        ：写路径加完 immutable 后唤醒后台线程

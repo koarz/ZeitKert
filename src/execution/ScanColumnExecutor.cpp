@@ -34,8 +34,8 @@ Status ScanColumnExecutor::Next(DataChunk &out) {
 
   // 第一次调用：把整列封装成命名列发射出去
   // 注：这里保持单批次发射以保留 ColumnVector::DataSpan 的 zero-copy 语义
-  auto named = std::make_shared<ColumnWithNameType>(column_, column_meta_->name_,
-                                                    column_meta_->type_);
+  auto named = std::make_shared<ColumnWithNameType>(
+      column_, column_meta_->name_, column_meta_->type_);
   out.AddColumn(named, column_->Size());
   emitted_ = true;
   return Status::OK();
